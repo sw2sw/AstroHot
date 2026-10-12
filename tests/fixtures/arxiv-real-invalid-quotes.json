@@ -1,0 +1,57 @@
+[
+  {
+    "abstract_original": "Synthetic abstract number 1 for the invalid-quote fixture. We measure $x_{1}=1$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 1\",\"summary_zh\":\"这是第 1 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 1 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"REVIEW\",\"study_type\":\"observation\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 1 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 1 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91001v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 2 for the invalid-quote fixture. We measure $x_{2}=2$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 2\",\"summary_zh\":\"这是第 2 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 2 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"simulation\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 2 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 2 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91002v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 3 for the invalid-quote fixture. We measure $x_{3}=3$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 3\",\"summary_zh\":\"这是第 3 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 3 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"theory\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 3 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 3 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91003v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 4 for the invalid-quote fixture. We measure $x_{4}=4$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 4\",\"summary_zh\":\"这是第 4 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 4 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"REVIEW\",\"study_type\":\"method\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 4 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 4 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91004v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 5 for the invalid-quote fixture. We measure $x_{5}=5$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 5\",\"summary_zh\":\"这是第 5 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 5 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"mixed\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 5 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 5 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91005v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 6 for the invalid-quote fixture. We measure $x_{6}=6$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 6\",\"summary_zh\":\"这是第 6 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 6 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"observation\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 6 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 6 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91006v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 7 for the invalid-quote fixture. We measure $x_{7}=7$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 7\",\"summary_zh\":\"这是第 7 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 7 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"REVIEW\",\"study_type\":\"simulation\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 7 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 7 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91007v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 8 for the invalid-quote fixture. We measure $x_{8}=8$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 8\",\"summary_zh\":\"这是第 8 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 8 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"theory\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 8 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 8 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91008v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 9 for the invalid-quote fixture. We measure $x_{9}=9$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 9\",\"summary_zh\":\"这是第 9 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 9 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"method\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 9 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 9 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91009v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 10 for the invalid-quote fixture. We measure $x_{10}=10$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 10\",\"summary_zh\":\"这是第 10 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 10 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"REVIEW\",\"study_type\":\"mixed\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 10 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 10 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91010v1"
+  },
+  {
+    "abstract_original": "Synthetic abstract number 11 for the invalid-quote fixture. We measure $x_{11}=11$ in the first sample.\nA second synthetic sentence follows here. It closes the sample and states nothing real.",
+    "content": "{\"title_zh\":\"合成示例标题 11\",\"summary_zh\":\"这是第 11 条合成示例摘要，仅用于测试证据片段的索引与校验。\",\"reason_zh\":\"这是第 11 条合成示例理由，仅用于测试改写引文必须失败的行为。\",\"verdict\":\"SELECT\",\"study_type\":\"observation\",\"evidence_abstract_quote\":\"A rewritten synthetic quote number 11 that is not an exact substring of the abstract.\",\"fulltext_review_question\":\"这是第 11 条合成核查问题，仅用于测试字段约束。\"}",
+    "subject": "2612.91011v1"
+  }
+]

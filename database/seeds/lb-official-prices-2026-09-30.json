@@ -1,0 +1,11 @@
+{
+  "_note": "Synthetic official-price sample for this release package. A newer file replaces an older entry, so this one supersedes the sample dated 2026-09-26. No price was read from a vendor page; placeholder values, per million tokens, in the sample currency. An entry with no prices and a note records that the sample vendor sells no paid API for that model.",
+  "prices": {
+    "example-1-pro": ["USD", 1.2, 4.8, 0.12, "https://example.org/pricing"],
+    "example-1-flash": ["USD", 0.2, 0.8, 0.02, "https://example.org/pricing"],
+    "northwind-1": ["CNY", 2, 6, 0.2, "https://example.org/pricing"],
+    "northwind-1-pro": ["CNY", 3, 9, 0.3, "https://example.org/pricing"],
+    "sample-oss-8-b": ["USD", null, null, null, "https://example.org/pricing", "synthetic sample: no paid API"],
+    "sample-oss-70-b": ["USD", null, null, null, "https://example.org/pricing", "synthetic sample: no paid API"]
+  }
+}

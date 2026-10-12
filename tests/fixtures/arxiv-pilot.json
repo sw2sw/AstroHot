@@ -1,0 +1,602 @@
+{
+  "schema_version": 1,
+  "report_type": "arxiv_astronomy_screening",
+  "run_id": "arxiv-synthetic-fixture-0001",
+  "issue_date": "2026-11-16",
+  "timezone": "Asia/Shanghai",
+  "generated_at_utc": "2026-11-15T16:00:00.000Z",
+  "mode": "pilot",
+  "coverage": "synthetic_fixture_not_a_real_census",
+  "review_status": "synthetic_fixture_review_status",
+  "input_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "input_collected_at_utc": "2026-11-15T15:30:00Z",
+  "candidate_pool_count": 60,
+  "paper_count": 22,
+  "counts": {
+    "SELECT": 5,
+    "REVIEW": 12,
+    "DEFER": 5
+  },
+  "ranked_selected_ids": [
+    "2612.90002v1",
+    "2612.90003v1",
+    "2612.90011v1",
+    "2612.90018v1",
+    "2612.90022v1"
+  ],
+  "items": [
+    {
+      "paper_key": "arxiv:2612.90001",
+      "arxiv_id": "2612.90001v1",
+      "title_original": "Synthetic Sample Paper 1: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 1：示例现象的占位研究",
+      "authors": [
+        "Ada Example",
+        "B. Placeholder"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:00:00Z",
+      "updated_at": "2026-11-15T10:00:00Z",
+      "url": "https://arxiv.org/abs/2612.90001v1",
+      "verdict": "REVIEW",
+      "study_type": "observation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90002",
+      "arxiv_id": "2612.90002v1",
+      "title_original": "Synthetic Sample Paper 2: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 2：示例现象的占位研究",
+      "authors": [
+        "C. Sample",
+        "D. Synthetic"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:01:00Z",
+      "updated_at": "2026-11-15T10:01:00Z",
+      "url": "https://arxiv.org/abs/2612.90002v1",
+      "verdict": "SELECT",
+      "study_type": "observation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90003",
+      "arxiv_id": "2612.90003v1",
+      "title_original": "Synthetic Sample Paper 3: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 3：示例现象的占位研究",
+      "authors": [
+        "E. Example-Only",
+        "F. Fixture"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:02:00Z",
+      "updated_at": "2026-11-15T10:02:00Z",
+      "url": "https://arxiv.org/abs/2612.90003v1",
+      "verdict": "SELECT",
+      "study_type": "theory",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90004",
+      "arxiv_id": "2612.90004v1",
+      "title_original": "Synthetic Sample Paper 4: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 4：示例现象的占位研究",
+      "authors": [
+        "G. Placeholder",
+        "H. Example"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:03:00Z",
+      "updated_at": "2026-11-15T10:03:00Z",
+      "url": "https://arxiv.org/abs/2612.90004v1",
+      "verdict": "REVIEW",
+      "study_type": "method",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90005",
+      "arxiv_id": "2612.90005v1",
+      "title_original": "Synthetic Sample Paper 5: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 5：示例现象的占位研究",
+      "authors": [
+        "Ada Example",
+        "B. Placeholder"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:04:00Z",
+      "updated_at": "2026-11-15T10:04:00Z",
+      "url": "https://arxiv.org/abs/2612.90005v1",
+      "verdict": "DEFER",
+      "study_type": "mixed",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90006",
+      "arxiv_id": "2612.90006v1",
+      "title_original": "Synthetic Sample Paper 6: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 6：示例现象的占位研究",
+      "authors": [
+        "C. Sample",
+        "D. Synthetic"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:05:00Z",
+      "updated_at": "2026-11-15T10:05:00Z",
+      "url": "https://arxiv.org/abs/2612.90006v1",
+      "verdict": "REVIEW",
+      "study_type": "observation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90007",
+      "arxiv_id": "2612.90007v1",
+      "title_original": "Synthetic Sample Paper 7: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 7：示例现象的占位研究",
+      "authors": [
+        "E. Example-Only",
+        "F. Fixture"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:06:00Z",
+      "updated_at": "2026-11-15T10:06:00Z",
+      "url": "https://arxiv.org/abs/2612.90007v1",
+      "verdict": "REVIEW",
+      "study_type": "simulation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90008",
+      "arxiv_id": "2612.90008v1",
+      "title_original": "Synthetic Sample Paper 8: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 8：示例现象的占位研究",
+      "authors": [
+        "G. Placeholder",
+        "H. Example"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:07:00Z",
+      "updated_at": "2026-11-15T10:07:00Z",
+      "url": "https://arxiv.org/abs/2612.90008v1",
+      "verdict": "REVIEW",
+      "study_type": "theory",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90009",
+      "arxiv_id": "2612.90009v1",
+      "title_original": "Synthetic Sample Paper 9: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 9：示例现象的占位研究",
+      "authors": [
+        "Ada Example",
+        "B. Placeholder"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:08:00Z",
+      "updated_at": "2026-11-15T10:08:00Z",
+      "url": "https://arxiv.org/abs/2612.90009v1",
+      "verdict": "DEFER",
+      "study_type": "method",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90010",
+      "arxiv_id": "2612.90010v1",
+      "title_original": "Synthetic Sample Paper 10: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 10：示例现象的占位研究",
+      "authors": [
+        "C. Sample",
+        "D. Synthetic"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:09:00Z",
+      "updated_at": "2026-11-15T10:09:00Z",
+      "url": "https://arxiv.org/abs/2612.90010v1",
+      "verdict": "DEFER",
+      "study_type": "mixed",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90011",
+      "arxiv_id": "2612.90011v1",
+      "title_original": "Synthetic Sample Paper 11: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 11：示例现象的占位研究",
+      "authors": [
+        "E. Example-Only",
+        "F. Fixture"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:10:00Z",
+      "updated_at": "2026-11-15T10:10:00Z",
+      "url": "https://arxiv.org/abs/2612.90011v1",
+      "verdict": "SELECT",
+      "study_type": "observation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90012",
+      "arxiv_id": "2612.90012v1",
+      "title_original": "Synthetic Sample Paper 12: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 12：示例现象的占位研究",
+      "authors": [
+        "G. Placeholder",
+        "H. Example"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:11:00Z",
+      "updated_at": "2026-11-15T10:11:00Z",
+      "url": "https://arxiv.org/abs/2612.90012v1",
+      "verdict": "REVIEW",
+      "study_type": "simulation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90013",
+      "arxiv_id": "2612.90013v1",
+      "title_original": "Synthetic Sample Paper 13: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 13：示例现象的占位研究",
+      "authors": [
+        "Ada Example",
+        "B. Placeholder"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:12:00Z",
+      "updated_at": "2026-11-15T10:12:00Z",
+      "url": "https://arxiv.org/abs/2612.90013v1",
+      "verdict": "DEFER",
+      "study_type": "theory",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90014",
+      "arxiv_id": "2612.90014v1",
+      "title_original": "Synthetic Sample Paper 14: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 14：示例现象的占位研究",
+      "authors": [
+        "C. Sample",
+        "D. Synthetic"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:13:00Z",
+      "updated_at": "2026-11-15T10:13:00Z",
+      "url": "https://arxiv.org/abs/2612.90014v1",
+      "verdict": "REVIEW",
+      "study_type": "method",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90015",
+      "arxiv_id": "2612.90015v1",
+      "title_original": "Synthetic Sample Paper 15: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 15：示例现象的占位研究",
+      "authors": [
+        "E. Example-Only",
+        "F. Fixture"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:14:00Z",
+      "updated_at": "2026-11-15T10:14:00Z",
+      "url": "https://arxiv.org/abs/2612.90015v1",
+      "verdict": "DEFER",
+      "study_type": "mixed",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90016",
+      "arxiv_id": "2612.90016v1",
+      "title_original": "Synthetic Sample Paper 16: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 16：示例现象的占位研究",
+      "authors": [
+        "G. Placeholder",
+        "H. Example"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:15:00Z",
+      "updated_at": "2026-11-15T10:15:00Z",
+      "url": "https://arxiv.org/abs/2612.90016v1",
+      "verdict": "REVIEW",
+      "study_type": "observation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90017",
+      "arxiv_id": "2612.90017v1",
+      "title_original": "Synthetic Sample Paper 17: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 17：示例现象的占位研究",
+      "authors": [
+        "Ada Example",
+        "B. Placeholder"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:16:00Z",
+      "updated_at": "2026-11-15T10:16:00Z",
+      "url": "https://arxiv.org/abs/2612.90017v1",
+      "verdict": "REVIEW",
+      "study_type": "simulation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90018",
+      "arxiv_id": "2612.90018v1",
+      "title_original": "Synthetic Sample Paper 18: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 18：示例现象的占位研究",
+      "authors": [
+        "C. Sample",
+        "D. Synthetic"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:17:00Z",
+      "updated_at": "2026-11-15T10:17:00Z",
+      "url": "https://arxiv.org/abs/2612.90018v1",
+      "verdict": "SELECT",
+      "study_type": "theory",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90019",
+      "arxiv_id": "2612.90019v1",
+      "title_original": "Synthetic Sample Paper 19: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 19：示例现象的占位研究",
+      "authors": [
+        "E. Example-Only",
+        "F. Fixture"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:18:00Z",
+      "updated_at": "2026-11-15T10:18:00Z",
+      "url": "https://arxiv.org/abs/2612.90019v1",
+      "verdict": "REVIEW",
+      "study_type": "method",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90020",
+      "arxiv_id": "2612.90020v1",
+      "title_original": "Synthetic Sample Paper 20: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 20：示例现象的占位研究",
+      "authors": [
+        "G. Placeholder",
+        "H. Example"
+      ],
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ],
+      "submitted_at": "2026-11-15T10:19:00Z",
+      "updated_at": "2026-11-15T10:19:00Z",
+      "url": "https://arxiv.org/abs/2612.90020v1",
+      "verdict": "REVIEW",
+      "study_type": "mixed",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90021",
+      "arxiv_id": "2612.90021v1",
+      "title_original": "Synthetic Sample Paper 21: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 21：示例现象的占位研究",
+      "authors": [
+        "Ada Example",
+        "B. Placeholder"
+      ],
+      "categories": [
+        "astro-ph.GA",
+        "astro-ph.SR"
+      ],
+      "submitted_at": "2026-11-15T10:20:00Z",
+      "updated_at": "2026-11-15T10:20:00Z",
+      "url": "https://arxiv.org/abs/2612.90021v1",
+      "verdict": "REVIEW",
+      "study_type": "observation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    },
+    {
+      "paper_key": "arxiv:2612.90022",
+      "arxiv_id": "2612.90022v1",
+      "title_original": "Synthetic Sample Paper 22: A Placeholder Study of Example Phenomena",
+      "title_zh": "合成示例论文 22：示例现象的占位研究",
+      "authors": [
+        "C. Sample",
+        "D. Synthetic"
+      ],
+      "categories": [
+        "astro-ph.CO",
+        "astro-ph.HE"
+      ],
+      "submitted_at": "2026-11-15T10:21:00Z",
+      "updated_at": "2026-11-15T10:21:00Z",
+      "url": "https://arxiv.org/abs/2612.90022v1",
+      "verdict": "SELECT",
+      "study_type": "simulation",
+      "summary_zh": "本文为合成示例摘要，仅用于测试 arXiv 候选初筛报告的导入与展示流程，不包含任何真实观测、数据或结论。",
+      "reason_zh": "合成示例理由：仅用于验证候选初筛报告的结构、计数与展示，不代表任何真实科学判断。",
+      "evidence_abstract_quote": "This is a synthetic evidence quote used only to exercise report validation.",
+      "fulltext_review_question": "合成示例核查问题：仅用于测试全文复核字段的存在与长度约束。",
+      "peer_review_status": "unverified",
+      "analysis_scope": "title_and_abstract_only",
+      "publication_status": "candidate_only"
+    }
+  ],
+  "note_zh": "本报告为合成测试数据，仅用于验证 arXiv 候选初筛报告的导入与展示，不包含任何真实论文内容。"
+}

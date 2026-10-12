@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+>
+
+<channel>
+	<title>Synthetic Astronomy News feed</title>
+	<atom:link href="https://skyandtelescope.org/astronomy-news/feed/" rel="self" type="application/rss+xml" />
+	<link>https://skyandtelescope.org/astronomy-news/</link>
+	<description>Synthetic sample feed used only by tests. No captured publisher content.</description>
+	<lastBuildDate>Fri, 09 Oct 2026 18:44:13 +0000</lastBuildDate>
+	<language>en-US</language>
+	<generator>https://wordpress.org/?v=0.0.0</generator>
+	<item>
+		<title>Synthetic observing guide for the sample week</title>
+		<link>https://skyandtelescope.org/astronomy-news/observing-news/synthetic-observing-guide-for-the-sample-week/</link>
+		<dc:creator><![CDATA[Sample Observer]]></dc:creator>
+		<pubDate>Fri, 09 Oct 2026 08:56:00 +0000</pubDate>
+		<category><![CDATA[Astronomy & Observing News]]></category>
+		<category><![CDATA[Observing]]></category>
+		<guid isPermaLink="false">https://skyandtelescope.org/?p=900000001</guid>
+		<description><![CDATA[<p>A synthetic observing guide entry written only for tests.</p>]]></description>
+			</item>
+  <item>
+		<title>Synthetic news story about a sample cluster</title>
+		<link>https://skyandtelescope.org/astronomy-news/synthetic-news-story-about-a-sample-cluster/</link>
+		<dc:creator><![CDATA[Sample Writer]]></dc:creator>
+		<pubDate>Fri, 09 Oct 2026 08:00:12 +0000</pubDate>
+		<category><![CDATA[Astronomy & Observing News]]></category>
+		<category><![CDATA[Star Clusters & Nebulae]]></category>
+		<guid isPermaLink="false">https://skyandtelescope.org/?p=900000002</guid>
+		<description><![CDATA[<p>A synthetic news entry written only for tests.</p>]]></description>
+			</item>
+  <item>
+		<title>Synthetic news story about a sample burst</title>
+		<link>https://skyandtelescope.org/astronomy-news/synthetic-news-story-about-a-sample-burst/</link>
+		<dc:creator><![CDATA[Sample Writer Two]]></dc:creator>
+		<pubDate>Thu, 08 Oct 2026 18:00:00 +0000</pubDate>
+		<category><![CDATA[Astronomy & Observing News]]></category>
+		<category><![CDATA[Cosmology]]></category>
+		<guid isPermaLink="false">https://skyandtelescope.org/?p=900000003</guid>
+		<description><![CDATA[<p>Another synthetic news entry written only for tests.</p>]]></description>
+			</item>
+</channel></rss>

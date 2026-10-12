@@ -1,0 +1,52 @@
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:prism="http://prismstandard.org/namespaces/basic/2.0/" xmlns:dc="http://purl.org/dc/elements/1.1/"
+         xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns="http://purl.org/rss/1.0/" xmlns:admin="http://webns.net/mvcb/">
+    <channel rdf:about="http://feeds.example.test/nature/rss/current">
+        <title>Synthetic Nature feed</title>
+        <description>Synthetic sample feed used only by tests. No captured publisher content.</description>
+        <link>http://feeds.example.test/nature/rss/current</link>
+        <admin:generatorAgent rdf:resource="https://www.nature.com/"/>
+        <dc:publisher>Synthetic</dc:publisher>
+        <dc:language>en</dc:language>
+        <prism:publicationName>Synthetic Nature</prism:publicationName>
+        </channel>
+<item rdf:about="https://www.nature.com/articles/d41586-026-90001-a">
+            <title><![CDATA[Synthetic news note one from the sample feed]]></title>
+            <link>https://www.nature.com/articles/d41586-026-90001-a</link>
+            <content:encoded>
+                <![CDATA[<p>Synthetic note about the first sample item. Published online: 09 October 2026.</p>Short synthetic teaser text.]]></content:encoded>
+            <dc:title><![CDATA[Synthetic news note one from the sample feed]]></dc:title>
+            <dc:identifier>doi:10.1038/d41586-026-90001-a</dc:identifier>
+            <dc:source>Nature, Published online: 2026-10-09; | doi:10.1038/d41586-026-90001-a</dc:source>
+            <dc:date>2026-10-09</dc:date>
+            <prism:publicationName>Synthetic Nature</prism:publicationName>
+            <prism:doi>10.1038/d41586-026-90001-a</prism:doi>
+            <prism:url>https://www.nature.com/articles/d41586-026-90001-a</prism:url>
+        </item>
+  <item rdf:about="https://www.nature.com/articles/d41586-026-90002-b">
+            <title><![CDATA[Synthetic news note two from the sample feed]]></title>
+            <link>https://www.nature.com/articles/d41586-026-90002-b</link>
+            <content:encoded>
+                <![CDATA[<p>Synthetic note about the second sample item. Published online: 09 October 2026.</p>Short synthetic teaser text.]]></content:encoded>
+            <dc:title><![CDATA[Synthetic news note two from the sample feed]]></dc:title>
+            <dc:creator>Sample Editor</dc:creator>
+            <dc:identifier>doi:10.1038/d41586-026-90002-b</dc:identifier>
+            <dc:source>Nature, Published online: 2026-10-09; | doi:10.1038/d41586-026-90002-b</dc:source>
+            <dc:date>2026-10-09</dc:date>
+            <prism:publicationName>Synthetic Nature</prism:publicationName>
+            <prism:doi>10.1038/d41586-026-90002-b</prism:doi>
+            <prism:url>https://www.nature.com/articles/d41586-026-90002-b</prism:url>
+        </item>
+  <item rdf:about="https://www.nature.com/articles/d41586-026-90003-c">
+            <title><![CDATA[Synthetic news note three from the sample feed]]></title>
+            <link>https://www.nature.com/articles/d41586-026-90003-c</link>
+            <content:encoded>
+                <![CDATA[<p>Synthetic note about the third sample item. Published online: 09 October 2026.</p>Short synthetic teaser text.]]></content:encoded>
+            <dc:title><![CDATA[Synthetic news note three from the sample feed]]></dc:title>
+            <dc:identifier>doi:10.1038/d41586-026-90003-c</dc:identifier>
+            <dc:source>Nature, Published online: 2026-10-09; | doi:10.1038/d41586-026-90003-c</dc:source>
+            <dc:date>2026-10-09</dc:date>
+            <prism:publicationName>Synthetic Nature</prism:publicationName>
+            <prism:doi>10.1038/d41586-026-90003-c</prism:doi>
+            <prism:url>https://www.nature.com/articles/d41586-026-90003-c</prism:url>
+        </item>
+</rdf:RDF>

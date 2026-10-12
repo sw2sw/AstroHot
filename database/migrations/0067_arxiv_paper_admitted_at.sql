@@ -1,0 +1,19 @@
+-- When this candidate row was last written into the archive: the instant a paper first entered it, or
+-- the instant a newer version replaced it. This is the reader-side "something arrived" signal.
+--
+-- It cannot reuse generated_at: that is the reporting run's own date, so a report imported late (or a
+-- candidate that is re-stored with an older document) carries an OLDER value and would leave a
+-- maximum over generated_at untouched — exactly how an admission used to hide behind a net decrease.
+-- A write instant is stamped when the row really enters the readable set, so any arrival raises it
+-- whatever date the paper itself carries, and a removal never can.
+--
+-- Backfill note: existing rows take the migration time, which is a one-off, conservative value (it can
+-- only make a reader see one extra "new content" prompt after this migration, never swallow one).
+--
+-- Numbering: this file was written as 0066_* while the magazine workstream (the other worktree) was
+-- also holding an untracked 0066_article_coverage.sql; scripts/migrate.ts records migrations by FILE
+-- NAME, so two files sharing a prefix is a governance collision even though it would not error at
+-- runtime. It has been renumbered to 0067 to leave 0066 to that workstream (integration still has to
+-- confirm the final numbering). IF NOT EXISTS keeps the rename harmless in any database that already
+-- recorded the old name — the same defensive form 0026/0027/0030/0031/0037/0038/0040/0041/0057 use.
+ALTER TABLE arxiv_papers ADD COLUMN IF NOT EXISTS admitted_at timestamptz NOT NULL DEFAULT now();

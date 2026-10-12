@@ -1,0 +1,431 @@
+{
+  "$comment": "首批天文信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。web_list 源用 url 作列表页入口（baseUrl 仅作相对链接基准）；中文选择器部署阶段抓真实页面后填 itemSelector/linkSelector/titleSelector，正式上线前在后台“预览抓取”人工复核。科学刊物候选源（rss-journal-*）一律 enabled:false，是否启用由主审单独批准；它们只走已有的 RSS 通路与摘要导读分支，不复制全文、不转载图片。候选 feed 配置一律保留在此，是否接入由启用开关控制；本项目不预先判定任何来源的使用许可。",
+  "sources": [
+    {
+      "id": "web-bao-research",
+      "name": "国家天文台 · 科研动态",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.bao.ac.cn/news/ky/",
+        "allowUrlRegex": "^https://www\\.bao\\.ac\\.cn/news/ky/[0-9]{6}/t[0-9]{8}_[0-9]+\\.html(?:[?#].*)?$",
+        "_aihot": {
+          "initialBackfillLimit": 5
+        },
+        "allowUrlPrefixes": [
+          "https://www.bao.ac.cn/news/ky/20"
+        ],
+        "linkSelector": "a[href]",
+        "publishedAtUtcOffset": "+08:00",
+        "itemSelector": "li:has(.box-date)",
+        "publishedAtSelector": ".box-date"
+      },
+      "tier": "T1",
+      "owner_entity_id": "bao",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方",
+        "科研成果"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-pmo-research",
+      "name": "紫金山天文台 · 科研进展",
+      "kind": "web_list",
+      "config": {
+        "url": "https://pmo.cas.cn/xwdt2019/kyjz2019/",
+        "detail": {
+          "maxFetches": 10,
+          "publishedAtAuthoritative": true,
+          "preserveListingDate": true,
+          "upgradeDatePrecision": true,
+          "publishedAtUtcOffset": "+08:00",
+          "publishedAtRegex": "发布时间\\s*[:：]\\s*((?:[0-9]{4})年[0-9]{1,2}月[0-9]{1,2}日)"
+        },
+        "allowUrlRegex": "^https://pmo\\.cas\\.cn/xwdt2019/kyjz2019/[0-9]{6}/t[0-9]{8}_[0-9]+\\.html(?:[?#].*)?$",
+        "_aihot": {
+          "initialBackfillLimit": 5
+        },
+        "allowUrlPrefixes": [
+          "https://pmo.cas.cn/xwdt2019/kyjz2019/20"
+        ],
+        "linkSelector": "a[href]",
+        "publishedAtUtcOffset": "+08:00",
+        "itemSelector": "ul.comment_list > li",
+        "publishedAtSelector": "span"
+      },
+      "tier": "T1",
+      "owner_entity_id": "pmo",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方",
+        "科研成果"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-shao-research",
+      "name": "上海天文台 · 科研进展",
+      "kind": "web_list",
+      "config": {
+        "url": "https://shao.cas.cn/2020Ver/xwdt/kyjz/",
+        "allowUrlRegex": "^https://shao\\.cas\\.cn/2020Ver/xwdt/kyjz/[0-9]{6}/t[0-9]{8}_[0-9]+\\.html(?:[?#].*)?$",
+        "_aihot": {
+          "initialBackfillLimit": 5
+        },
+        "allowUrlPrefixes": [
+          "https://shao.cas.cn/2020Ver/xwdt/kyjz/20"
+        ],
+        "linkSelector": "a[href]",
+        "publishedAtUtcOffset": "+08:00",
+        "itemSelector": "li:has(span.right)",
+        "publishedAtSelector": "span.right"
+      },
+      "tier": "T1",
+      "owner_entity_id": "shao",
+      "participation_mode": "editorial",
+      "interval_minutes": 240,
+      "tags": [
+        "官方",
+        "科研成果"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-eso-news",
+      "name": "ESO · 科学新闻",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.eso.org/public/news/feed/",
+        "_aihot": {
+          "initialBackfillLimit": 5
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "eso",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "欧洲"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-esa-science",
+      "name": "ESA Space Science",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.esa.int/rssfeed/ESC",
+        "cardImageAllowed": true,
+        "cardImageRequiresCredit": true,
+        "_aihot": {
+          "initialBackfillLimit": 5
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "esa",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "欧洲"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-esa-hubble",
+      "name": "ESA Hubble · 新闻",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://esahubble.org/news/feed/",
+        "_aihot": {
+          "initialBackfillLimit": 5
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "esa",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "其他"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-esa-webb",
+      "name": "ESA Webb · 新闻",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://esawebb.org/news/feed/",
+        "cardImageAllowed": true,
+        "cardImageRequiresCredit": true,
+        "_aihot": {
+          "initialBackfillLimit": 5
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "esa",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "其他"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-noirlab",
+      "name": "NOIRLab · 新闻",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://noirlab.edu/public/news/feed/",
+        "cardImageAllowed": true,
+        "cardImageRequiresCredit": true,
+        "_aihot": {
+          "initialBackfillLimit": 5
+        }
+      },
+      "tier": "T1",
+      "owner_entity_id": "noirlab",
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "官方",
+        "其他"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-journal-science-space",
+      "name": "Science · Space（RSS · 科学刊物，仅公开摘要）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.science.org/action/showFeed?ui=0&mi=sfug99&type=search&feed=rss&query=%2526ConceptID%253D502894%2526target%253Dtopic",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "天文新闻"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-sky-telescope",
+      "name": "Sky & Telescope · 天文新闻（RSS · 科学刊物，含观测指南）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://skyandtelescope.org/astronomy-news/feed/",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "天文新闻"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-astronomy-magazine",
+      "name": "Astronomy Magazine · News（RSS · 科学刊物，含观测指南）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.astronomy.com/tags/news/feed/",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "天文新闻"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-nature",
+      "name": "Nature · 综合（RSS · 科学刊物，须先过滤天文相关性与文章类型）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.nature.com/nature.rss",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "综合"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-scientific-american",
+      "name": "Scientific American（RSS · 科学刊物，须先过滤天文／太空／宇宙学）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.scientificamerican.com/platform/syndication/rss/",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "综合"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-quanta-astronomy",
+      "name": "Quanta Magazine · Astronomy（RSS · 科学刊物，低频深度解读）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.quantamagazine.org/tag/astronomy/feed/",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "深度解读"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-new-scientist-space",
+      "name": "New Scientist · Space（RSS · 科学刊物，专题内混入非天文评论，须二次主题筛选）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.newscientist.com/subject/space/feed/",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "天文新闻"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-astronomy-sky-this-week",
+      "name": "Astronomy Magazine · The Sky This Week（RSS · 科学刊物，观测指南）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.astronomy.com/tags/sky-this-week/feed/",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "观测指南"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-aps-physics",
+      "name": "APS Physics（RSS · 科学刊物，物理；首版不接入，仅保留经核查的候选配置）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://feeds.aps.org/rss/recent/physics.xml",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "物理"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "rss-journal-nature-astronomy",
+      "name": "Nature Astronomy（RSS · 科学刊物，天文论文摘要；首版不接入，仅保留经核查的候选配置）",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.nature.com/natastron.rss",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "科学刊物",
+        "天文论文"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "oldReparseIdentical": true,
+  "oldHash": "81d0fadd720dbb186a98ff237251e198fa08e22102e1d63a65cfdc9e0f596122",
+  "newHash": "c5bbadbfec3e6a6cfdf81abb20938315c4a0830fe5ab9292aa47304c834cf8f8",
+  "diff": [
+    {
+      "field": "authors",
+      "old": [
+        "Ada Example",
+        "B. Placeholder",
+        "C. Sample"
+      ],
+      "new": [
+        "Ada Example",
+        "B. Placeholder",
+        "C. Sample-Editors"
+      ]
+    }
+  ]
+}

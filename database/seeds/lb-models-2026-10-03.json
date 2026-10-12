@@ -1,0 +1,36 @@
+{
+  "_note": "Synthetic model directory for the leaderboard, written for this release package. Nothing here was read from a vendor page, a model repository or a benchmark board: it is a minimal sample that keeps the file format and the import path working, so a blank deployment can resolve and score models on a fixed scale. Replace it with your own directory before a real round. Exported 2026-10-03.",
+  "models": [
+    ["example-1-pro", "Example 1 Pro", "Example Labs", "example-labs", "2026-01-15", "synthetic-board"],
+    ["example-1-flash", "Example 1 Flash", "Example Labs", "example-labs", "2026-02-01", "synthetic-board"],
+    ["northwind-1", "Northwind 1", "Northwind", "northwind", "2026-03-10", "synthetic-board"],
+    ["northwind-1-pro", "Northwind 1 Pro", "Northwind", "northwind", "2026-03-10", "synthetic-board"],
+    ["sample-oss-8-b", "Sample OSS 8 B", "Sample Org", "sample-org", "2026-04-02", "synthetic-board"],
+    ["sample-oss-70-b", "Sample OSS 70 B", "Sample Org", "sample-org", null, null]
+  ],
+  "aliases": {
+    "synthetic-board": {
+      "Example 1 Pro": "example-1-pro",
+      "example-1-pro": "example-1-pro",
+      "Northwind 1": "northwind-1",
+      "Sample OSS 8B": "sample-oss-8-b",
+      "Sample OSS 70B": "sample-oss-70-b"
+    },
+    "synthetic-open": {
+      "example-labs/example-1-flash": "example-1-flash",
+      "sample-org/sample-oss-8b": "sample-oss-8-b"
+    }
+  },
+  "calibrations": [
+    {
+      "methodology_version": "synthetic-2026.01",
+      "unit": "synthetic_unit",
+      "protocol": "synthetic:protocol:v1",
+      "calibration": {
+        "note": "Synthetic sample scale, not a measured calibration.",
+        "anchorSlugs": ["example-1-pro"],
+        "range": [0, 100]
+      }
+    }
+  ]
+}

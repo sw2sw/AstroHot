@@ -1,0 +1,234 @@
+{
+  "groups": [
+    {
+      "key": "company",
+      "name": "机构与任务",
+      "blurb": "按机构与空间任务追踪科研动态"
+    },
+    {
+      "key": "field",
+      "name": "学科方向",
+      "blurb": "按研究方向深挖：系外行星、黑洞、宇宙学……"
+    },
+    {
+      "key": "genre",
+      "name": "内容形态",
+      "blurb": "按内容类型浏览：科研成果、数据发布、图像、科普……"
+    }
+  ],
+  "topics": [
+    {
+      "slug": "bao",
+      "name": "国家天文台",
+      "group": "company",
+      "entityId": "bao",
+      "orgNames": [
+        "国家天文台",
+        "NAOC",
+        "中国科学院国家天文台"
+      ],
+      "leaderboardProvider": null,
+      "definition": "中国科学院国家天文台的科研动态：FAST、巡天与光学红外研究、脉冲星与系外行星等成果的持续追踪。"
+    },
+    {
+      "slug": "pmo",
+      "name": "紫金山天文台",
+      "group": "company",
+      "entityId": "pmo",
+      "orgNames": [
+        "紫金山天文台",
+        "中国科学院紫金山天文台"
+      ],
+      "leaderboardProvider": null,
+      "definition": "中国科学院紫金山天文台的科研进展：系外行星、恒星形成、高能天体物理与暗物质研究的持续追踪。"
+    },
+    {
+      "slug": "shao",
+      "name": "上海天文台",
+      "group": "company",
+      "entityId": "shao",
+      "orgNames": [
+        "上海天文台",
+        "中国科学院上海天文台"
+      ],
+      "leaderboardProvider": null,
+      "definition": "中国科学院上海天文台的科研进展：射电与银河系结构、激光测距、时间频率与引力波前沿的追踪。"
+    },
+    {
+      "slug": "eso",
+      "name": "ESO 欧洲南方天文台",
+      "group": "company",
+      "entityId": "eso",
+      "orgNames": [
+        "ESO",
+        "European Southern Observatory"
+      ],
+      "leaderboardProvider": null,
+      "definition": "欧洲南方天文台的科研与发布：甚大望远镜、ALMA、ELT、系外行星与宇宙学的重大成果追踪。"
+    },
+    {
+      "slug": "esa",
+      "name": "ESA 欧洲空间局",
+      "group": "company",
+      "entityId": "esa",
+      "orgNames": [
+        "ESA",
+        "European Space Agency",
+        "欧空局"
+      ],
+      "leaderboardProvider": null,
+      "definition": "欧洲空间局的科学任务与空间探测：宇宙学、太阳系探测、JWST/Hubble/Webb 任务的追踪。"
+    },
+    {
+      "slug": "noirlab",
+      "name": "NOIRLab",
+      "group": "company",
+      "entityId": "noirlab",
+      "orgNames": [
+        "NOIRLab",
+        "NSF NOIRLab"
+      ],
+      "leaderboardProvider": null,
+      "definition": "NOIRLab 的观测与数据发布：全光巡天、星系调查与公开数据成果的追踪。"
+    },
+    {
+      "slug": "exoplanets",
+      "name": "系外行星",
+      "group": "field",
+      "tags": [
+        "系外行星"
+      ],
+      "chronicleTerms": [
+        "系外行星",
+        "宜居带",
+        "行星大气",
+        "原行星盘",
+        "行星形成",
+        "越凌",
+        "径向速度"
+      ],
+      "definition": "太阳系之外的行星：发现、刻画大气与表面、宜居性评估与原行星盘的形成研究进展。"
+    },
+    {
+      "slug": "black-holes",
+      "name": "黑洞与紧凑天体",
+      "group": "field",
+      "tags": [
+        "黑洞",
+        "中子星",
+        "脉冲星"
+      ],
+      "chronicleTerms": [
+        "黑洞",
+        "中子星",
+        "脉冲星",
+        "引力波",
+        "回响",
+        "活动星系核",
+        "GW"
+      ],
+      "definition": "黑洞、中子星、脉冲星等致密天体及其爆发与引力波探测的进展追踪。"
+    },
+    {
+      "slug": "stars",
+      "name": "恒星与暂现源",
+      "group": "field",
+      "tags": [
+        "恒星形成",
+        "恒星演化",
+        "超新星",
+        "伽马暴"
+      ],
+      "chronicleTerms": [
+        "恒星形成",
+        "恒星演化",
+        "超新星",
+        "伽马暴",
+        "暂现源",
+        "潮汐瓦解"
+      ],
+      "definition": "恒星从诞生到演化终点的生命历程与各类天体爆发暂现事件的追踪。"
+    },
+    {
+      "slug": "cosmology",
+      "name": "星系与宇宙学",
+      "group": "field",
+      "tags": [
+        "星系演化",
+        "暗物质",
+        "暗能量",
+        "宇宙学"
+      ],
+      "chronicleTerms": [
+        "星系",
+        "宇宙学",
+        "暗物质",
+        "暗能量",
+        "早期宇宙"
+      ],
+      "definition": "星系动力学与演化、暗物质暗能量和大尺度结构的宇宙学进展追踪。"
+    },
+    {
+      "slug": "solar",
+      "name": "太阳与空间天气",
+      "group": "field",
+      "tags": [
+        "太阳",
+        "空间天气"
+      ],
+      "chronicleTerms": [
+        "太阳",
+        "日冕",
+        "耀斑",
+        "空间天气"
+      ],
+      "definition": "太阳磁场与活动、日冕物质抛射与空间天气对地球和航天器影响的研究追踪。"
+    },
+    {
+      "slug": "missions",
+      "name": "望远镜与任务",
+      "group": "field",
+      "tags": [
+        "望远镜",
+        "巡天",
+        "探测器"
+      ],
+      "chronicleTerms": [
+        "望远镜",
+        "巡天",
+        "探测器",
+        "发射",
+        "任务"
+      ],
+      "definition": "地面望远镜与空间任务的研究、建造、发射与控制进展以及巡天数据发布。"
+    },
+    {
+      "slug": "research-results",
+      "name": "科研成果",
+      "group": "genre",
+      "tags": [
+        "科研成果"
+      ],
+      "definition": "经核实的重大科学研究结果、论文与发现，优先呈现一手机构新闻稿与论文证据。"
+    },
+    {
+      "slug": "data-releases",
+      "name": "数据发布",
+      "group": "genre",
+      "tags": [
+        "数据发布"
+      ],
+      "definition": "公开数据、巡天目录、仿真与算法研究的发布与更新，使读者能拿到原始证据。"
+    },
+    {
+      "slug": "images-outreach",
+      "name": "图像与科普",
+      "group": "genre",
+      "tags": [
+        "图像发布",
+        "科普"
+      ],
+      "definition": "天文图像的发布与公众科普解读、天象预报与科普活动，让天文发现可视化。"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {parseArxivAtom} from '../packages/backend/src/arxiv/collect.ts';
+const entry='<entry><id>http://arxiv.org/abs/2401.00001v1</id><title>T</title><summary>A</summary><published>2024-01-01T00:00:00Z</published><updated>2024-01-02T00:00:00Z</updated><author><name>Alice</name></author><category term="astro-ph.CO"/></entry>';
+const feed=(e:string)=>`<feed xmlns="http://www.w3.org/2005/Atom">${e}</feed>`;
+test('rejects rebound entry namespace',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('<entry>','<entry xmlns="urn:fake">')))));
+test('rejects rebound required-field namespace',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('<title>','<title xmlns="urn:fake">')))));
+test('rejects structurally empty entry rather than no papers',()=>assert.throws(()=>parseArxivAtom(feed('<entry/>'))));
+test('rejects zero version',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('v1','v0')))));
+test('rejects unknown astro-ph category',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('astro-ph.CO','astro-ph.NOTREAL')))));
+test('rejects missing author',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('<author><name>Alice</name></author>','')))));
+test('rejects impossible calendar date',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('2024-01-01','2024-02-30')))));
+test('rejects credential-bearing ID URL',()=>assert.throws(()=>parseArxivAtom(feed(entry.replace('http://arxiv.org','http://user:pass@arxiv.org')))));
+test('accepts actual arXiv feed root extension namespaces',()=>assert.equal(parseArxivAtom(feed(entry.replace('</entry>','<arxiv:primary_category term="astro-ph.CO"/></entry>')).replace('<feed xmlns=', '<feed xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns='))[0].arxiv_id,'2401.00001v1'));
+test('rejects ambiguous multiple document roots',()=>assert.throws(()=>parseArxivAtom(feed(entry)+'<other/>')));

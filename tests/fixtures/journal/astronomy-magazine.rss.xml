@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Synthetic Astronomy Magazine news feed</title>
+	<atom:link href="https://www.astronomy.com/tags/news/feed/" rel="self" type="application/rss+xml" />
+	<link>https://www.astronomy.com/tags/news/</link>
+	<description>Synthetic sample feed used only by tests. No captured publisher content.</description>
+	<lastBuildDate>Fri, 09 Oct 2026 17:49:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<generator>https://wordpress.org/?v=0.0.0</generator>
+	<item>
+		<title>Synthetic mission story about a sample lunar pit</title>
+		<link>https://www.astronomy.com/science/synthetic-mission-story-about-a-sample-lunar-pit/</link>
+		<dc:creator><![CDATA[Sample Reporter]]></dc:creator>
+		<pubDate>Fri, 09 Oct 2026 17:49:35 +0000</pubDate>
+		<category><![CDATA[Robotic Spaceflight]]></category>
+		<category><![CDATA[News]]></category>
+		<guid isPermaLink="false">https://www.astronomy.com/?p=900000101</guid>
+		<description><![CDATA[<p>A synthetic mission story written only for tests.</p>]]></description>
+			</item>
+  <item>
+		<title>Synthetic sky guide for the sample week</title>
+		<link>https://www.astronomy.com/the-sky-this-week/synthetic-sky-guide-for-the-sample-week/</link>
+		<dc:creator><![CDATA[Sample Observer]]></dc:creator>
+		<pubDate>Fri, 09 Oct 2026 05:00:00 +0000</pubDate>
+		<category><![CDATA[The Sky This Week]]></category>
+		<category><![CDATA[News]]></category>
+		<guid isPermaLink="false">https://www.astronomy.com/?p=900000102</guid>
+		<description><![CDATA[<p>A synthetic sky guide written only for tests.</p>]]></description>
+			</item>
+  <item>
+		<title>Synthetic science story about a sample nebula</title>
+		<link>https://www.astronomy.com/science/synthetic-science-story-about-a-sample-nebula/</link>
+		<dc:creator><![CDATA[Sample Reporter Two]]></dc:creator>
+		<pubDate>Thu, 08 Oct 2026 15:00:00 +0000</pubDate>
+		<category><![CDATA[Science]]></category>
+		<category><![CDATA[News]]></category>
+		<guid isPermaLink="false">https://www.astronomy.com/?p=900000103</guid>
+		<description><![CDATA[<p>A synthetic science story written only for tests.</p>]]></description>
+			</item>
+</channel></rss>

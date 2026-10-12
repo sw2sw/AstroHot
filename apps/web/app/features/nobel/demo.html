@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>诺贝尔奖 2026 专题 · 合成演示</title>
+<style>
+  :root { color-scheme: light dark; --ink:#1b1a17; --ink2:#57534e; --line:#e3ded4; --gold:#c6a05a; --bg:#fbf9f5; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px 48px; background:var(--bg); color:var(--ink); font:15px/1.65 system-ui,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  .demo-banner { margin:0 0 20px; padding:12px 16px; border:1px solid var(--gold); border-radius:12px; background:rgba(198,160,90,.12); font-size:13px; font-weight:600; }
+  h1 { margin:0 0 4px; font-size:26px; letter-spacing:-.01em; }
+  .sub { margin:0 0 24px; color:var(--ink2); font-size:13px; }
+  .card { border:1px solid var(--line); border-radius:16px; background:#fff; padding:18px 20px; margin:0 0 18px; }
+  .card > h2 { display:flex; align-items:center; gap:10px; margin:0 0 14px; font-size:17px; }
+  .hint { font-size:12px; font-weight:500; color:var(--ink2); border:1px solid var(--line); border-radius:999px; padding:2px 10px; }
+  .calrow { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
+  .calrow:first-of-type { border-top:0; }
+  .calrow .cat { flex:1; min-width:0; font-weight:600; }
+  .calrow .date { color:var(--ink2); font-size:13px; font-variant-numeric: tabular-nums; }
+  .calrow .status { font-size:12px; font-weight:600; border-radius:999px; padding:2px 10px; background:rgba(198,160,90,.18); }
+  .calrow.now .status { background:rgba(120,160,120,.2); }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+  .award { border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .award h3 { margin:0 0 6px; font-size:14px; }
+  .award p { margin:0; font-size:13px; color:var(--ink2); }
+  .award[data-cat="physics"] .award-badge { color:#7a6a3a; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
+  .toolbar input, .toolbar button { font:inherit; padding:8px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:inherit; }
+  dialog { border:1px solid var(--line); border-radius:16px; padding:20px; max-width:560px; }
+  dialog::backdrop { background:rgba(20,18,15,.45); }
+  .placeholder { display:block; width:100%; max-width:420px; height:auto; border:1px solid var(--line); border-radius:12px; }
+  nav.site a { margin-right:14px; font-size:13px; color:var(--ink2); }
+  @media (prefers-color-scheme: dark) { :root { --ink:#f2efe9; --ink2:#b9b3a8; --line:#3a3730; --bg:#191713; } .card, .award, dialog, .toolbar input, .toolbar button { background:#211e19; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="demo-banner">合成演示数据 · 非真实获奖信息：本页由项目自行编写的示例文档渲染，不含任何真实奖项、得主、引文或第三方转载内容，仅用于展示专题页的版式与交互。</p>
+
+  <header>
+    <h1>诺贝尔奖 2026 专题</h1>
+    <p class="sub">合成演示 · 数据口径为「揭晓状态」示例，不代表官方事实核验</p>
+  </header>
+
+  <nav class="site" aria-label="站内导航">
+    <a href="/">首页</a><a href="/all">全部</a><a href="/arxiv">arXiv 候选</a><a href="/imagery">天文影像</a><a href="/calendar">天象日历</a><a href="/more">更多</a>
+  </nav>
+
+  <section class="card" aria-labelledby="summary-title">
+    <h2 id="summary-title">各奖项速览 <span class="hint">{{NOBEL_PENDING_SUMMARY}}</span></h2>
+    <div class="toolbar">
+      <input id="mergeSearch" type="search" placeholder="搜索示例奖项" aria-label="搜索示例奖项">
+      <button id="filters" type="button">筛选</button>
+      <button id="mobileTheme" type="button">主题</button>
+    </div>
+    <div class="grid">
+      <article class="award" data-cat="physics">
+        <h3>物理学奖 · 示例条目</h3>
+        <p>合成演示：这里原本展示奖项主题与公开来源摘要，本发行包不附带任何真实获奖信息。</p>
+      </article>
+      <article class="award" data-cat="chemistry">
+        <h3>化学奖 · 示例条目</h3>
+        <p>合成演示：仅用于验证卡片、徽标与详情入口的排版。</p>
+      </article>
+      <article class="award" data-cat="literature">
+        <h3>文学奖 · 示例条目</h3>
+        <p>合成演示：不包含任何真实作者、作品或引文。</p>
+      </article>
+      <article class="award" data-cat="peace">
+        <h3>和平奖 · 示例条目</h3>
+        <p>合成演示：示例文本，不含真实机构、人名或授奖理由。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="card cal" aria-labelledby="calendar-title">
+    <h2 id="calendar-title">揭晓日历（示例）</h2>
+    <div class="calrow now"><span class="cat">物理学奖</span><span class="date">10-07</span><span class="status">已揭晓</span></div>
+    <div class="calrow now"><span class="cat">化学奖</span><span class="date">10-08</span><span class="status">已揭晓</span></div>
+    <div class="calrow now"><span class="cat">文学奖</span><span class="date">10-09</span><span class="status">已揭晓</span></div>
+    <div class="calrow"><span class="cat">和平奖</span><span class="date">10-10</span><span class="status">待揭晓</span></div>
+    <div class="calrow"><span class="cat">经济学奖</span><span class="date">10-12</span><span class="status">待揭晓</span></div>
+  </section>
+
+  <section class="card" aria-labelledby="detail-title">
+    <h2 id="detail-title">奖项详情（示例）</h2>
+    <img class="placeholder" src="merged-assets/nobel-demo-banner.png" alt="项目自制的几何占位图，用于演示详情区配图位；不是真实奖项图片。">
+    <p><button id="detailNav" type="button">打开示例详情</button></p>
+    <dialog id="prizeDialog" aria-labelledby="prizeDialogTitle">
+      <h3 id="prizeDialogTitle">示例详情</h3>
+      <p>合成演示：详情弹窗用于展示深链与关闭交互；内容为占位文本，不含真实获奖事实。</p>
+      <form method="dialog"><button id="closeDetail" type="submit">关闭</button></form>
+    </dialog>
+  </section>
+</div>
+<script>
+  // Synthetic demo interactions only: the dialog opens and closes; nothing is fetched.
+  var dialog = document.getElementById("prizeDialog");
+  var open = document.getElementById("detailNav");
+  if (dialog && open && typeof dialog.showModal === "function") { open.addEventListener("click", function () { dialog.showModal(); }); }
+</script>
+</body>
+</html>

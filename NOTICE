@@ -1,0 +1,24 @@
+AIHOT
+Copyright (c) 2026 数字生命卡兹克. The code is licensed under the MIT License (LICENSE).
+
+The name "AIHOT" and the AIHOT logo are not licensed under the MIT License. Please use your own name
+and logo for your site. The brand files shipped under industry/brand/ in this release are neutral
+placeholders, not the AIHOT logo.
+
+This repository contains third-party material under its own terms:
+
+- assets/og-fonts/: Noto Sans SC, SIL Open Font License 1.1 (full text: assets/og-fonts/OFL.txt; provenance: assets/og-fonts/LICENSE). Bundled.
+
+Third-party material that upstream carried, but that this release does NOT bundle:
+
+- assets/model-providers/: model and provider marks, mostly from Lobe Icons (MIT). The marks remain
+  trademarks of their respective owners and were used only to identify them. They are removed from
+  this release; the attribution is kept here as a record of that material.
+- assets/leaderboard-sources/: the published marks of each evaluation operator, used only to identify
+  them. Removed from this release; the attribution is kept here as a record of that material.
+
+The demo sources in industry/sources.json are public feeds of their publishers. Their content belongs
+to them; by default the site shows only a summary and a link to the original. No third-party articles,
+news or paper responses, calendar data, images or captured fixtures are bundled in this release; a
+deployment that enables collection fetches from those publishers at runtime and is responsible for
+its own copyright and access checks.

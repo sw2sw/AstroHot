@@ -1,0 +1,251 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rss xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
+  <channel>
+    <title>astro-ph synthetic fixture updates</title>
+    <link>http://rss.example.test/rss/astro-ph</link>
+    <description>Synthetic announcement feed used only by tests.</description>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 07 Oct 2026 04:00:16 +0000</lastBuildDate>
+    <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+    <item>
+      <title>Synthetic announcement 1</title>
+      <link>https://arxiv.org/abs/2612.92001</link>
+      <category>astro-ph.CO</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92001v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 2</title>
+      <link>https://arxiv.org/abs/2612.92002</link>
+      <category>astro-ph.EP</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92002v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 3</title>
+      <link>https://arxiv.org/abs/2612.92003</link>
+      <category>astro-ph.GA</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92003v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 4</title>
+      <link>https://arxiv.org/abs/2612.92004</link>
+      <category>astro-ph.HE</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92004v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 5</title>
+      <link>https://arxiv.org/abs/2612.92005</link>
+      <category>astro-ph.IM</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92005v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 6</title>
+      <link>https://arxiv.org/abs/2612.92006</link>
+      <category>astro-ph.SR</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92006v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 7</title>
+      <link>https://arxiv.org/abs/2612.92007</link>
+      <category>astro-ph.CO</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92007v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 8</title>
+      <link>https://arxiv.org/abs/2612.92008</link>
+      <category>astro-ph.EP</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92008v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 9</title>
+      <link>https://arxiv.org/abs/2612.92009</link>
+      <category>astro-ph.GA</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92009v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 10</title>
+      <link>https://arxiv.org/abs/2612.92010</link>
+      <category>astro-ph.HE</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92010v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 11</title>
+      <link>https://arxiv.org/abs/2612.92011</link>
+      <category>astro-ph.IM</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92011v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 12</title>
+      <link>https://arxiv.org/abs/2612.92012</link>
+      <category>astro-ph.SR</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92012v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 13</title>
+      <link>https://arxiv.org/abs/2612.92013</link>
+      <category>astro-ph.CO</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92013v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 14</title>
+      <link>https://arxiv.org/abs/2612.92014</link>
+      <category>astro-ph.EP</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92014v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 15</title>
+      <link>https://arxiv.org/abs/2612.92015</link>
+      <category>astro-ph.GA</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92015v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 16</title>
+      <link>https://arxiv.org/abs/2612.92016</link>
+      <category>astro-ph.HE</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92016v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 17</title>
+      <link>https://arxiv.org/abs/2612.92017</link>
+      <category>astro-ph.IM</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92017v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 18</title>
+      <link>https://arxiv.org/abs/2612.92018</link>
+      <category>astro-ph.SR</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92018v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>new</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 19</title>
+      <link>https://arxiv.org/abs/2612.92019</link>
+      <category>astro-ph.CO</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92019v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 20</title>
+      <link>https://arxiv.org/abs/2612.92020</link>
+      <category>astro-ph.EP</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92020v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 21</title>
+      <link>https://arxiv.org/abs/2612.92021</link>
+      <category>astro-ph.GA</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92021v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 22</title>
+      <link>https://arxiv.org/abs/2612.92022</link>
+      <category>astro-ph.HE</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92022v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 23</title>
+      <link>https://arxiv.org/abs/2612.92023</link>
+      <category>astro-ph.IM</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92023v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 24</title>
+      <link>https://arxiv.org/abs/2612.92024</link>
+      <category>astro-ph.SR</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92024v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 25</title>
+      <link>https://arxiv.org/abs/2612.92025</link>
+      <category>astro-ph.CO</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92025v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>cross</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 26</title>
+      <link>https://arxiv.org/abs/2612.92026</link>
+      <category>astro-ph.EP</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92026v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>cross</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 27</title>
+      <link>https://arxiv.org/abs/2612.92027</link>
+      <category>astro-ph.GA</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92027v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>cross</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 28</title>
+      <link>https://arxiv.org/abs/2612.92028</link>
+      <category>astro-ph.HE</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92028v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>cross</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 29</title>
+      <link>https://arxiv.org/abs/2612.92029</link>
+      <category>astro-ph.IM</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92029v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace-cross</arxiv:announce_type>
+    </item>
+    <item>
+      <title>Synthetic announcement 30</title>
+      <link>https://arxiv.org/abs/2612.92030</link>
+      <category>astro-ph.SR</category>
+      <guid isPermaLink="false">oai:arXiv.org:2612.92030v1</guid>
+      <pubDate>Wed, 07 Oct 2026 00:00:00 -0400</pubDate>
+      <arxiv:announce_type>replace-cross</arxiv:announce_type>
+    </item>
+  </channel>
+</rss>
