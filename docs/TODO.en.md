@@ -31,6 +31,19 @@ Ordinary functional defects may be handled collaboratively with stated impact; n
 - **Error visibility**: distinguish local admission, endpoint capacity, cooldown, database failures and upstream 429s. Retain redacted APOD substep exceptions linked to real receipts, rather than only `translation_unavailable` or whole-job success.
 - Verify with synthetic slow responses, low concurrency, 429s, uncertain outcomes and multiple instances. No fixed-status claim without evidence. See [capacity and backlogs](../KNOWN-ISSUES.en.md#model-capacity-and-processing-backlogs).
 
+## arXiv collection scheduling: pending fix
+
+Status: the six-hour cooldown has two timing bases — ordinary retries count from the previous attempt's start, HTTP 429 from when the pause was persisted — while the scheduler only fires at fixed 09/15/21 Beijing times. A retry arriving a few seconds early is skipped for the whole slot with no catch-up. Observed 2026-10-13: after a 09:02 failure, the 15:00 trigger missed the gate by ~17 seconds and was skipped, pushing the next real attempt to 21:00.
+
+Agreed target logic:
+
+- First successful collection of the day with papers stored → no more collection that day.
+- Failure, or success with no new paper data → retry 6 hours after that attempt finishes.
+- A longer upstream 429 Retry-After → honor the later time, never earlier.
+- Partial success (papers stored, only individual versions exceptional) → the day closes; exceptions follow the existing mechanism.
+
+Implementation notes: remove the fixed clock slots and the queue's automatic retry, keeping only the business six-hour retry; keep a single persisted "next allowed collection time" checked by a background due-poll (the poll itself does not call arXiv); keep the daily retry cap, cross-day cooldown, manual pause, dedup and lease mutex; the waiting state must survive restarts. Production scheduling stays unchanged until this is implemented and reviewed.
+
 ## Observing guides
 
 This snapshot retains the guide entrance in the homepage sky-calendar card and a read-only guide page backed by a manually curated list of explicit article IDs. This release ships no guide article IDs (the list is empty and the page shows an empty state). Manual curation remains sufficient while article volume is low; automatic classification is not required. Check the release version for final availability.
