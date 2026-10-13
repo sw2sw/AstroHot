@@ -73,13 +73,15 @@ test("report publication and its receipt commit together and recovery reuses the
   assert.equal((await sql`SELECT status FROM receipts WHERE subject = 'report:weekly:2024-W18'`)[0]!.status, "completed");
 });
 
-test("empty older gaps cannot starve a later daily, weekly or monthly, and failures remain visible", async () => {
+test("empty older gaps cannot starve a later daily, weekly or monthly", async () => {
   // An older issue carried an item; the days after it are empty. Weeklies and monthlies are compiled from dailies.
   const early = await item("2024-01-22T12:00:00Z");
   await sql`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at)
     VALUES ('daily', '2024-01-23', now(), now(), ${sql.json({ sections: [{ label: "行业动态", items: [{ itemId: early, title: early }] }] })}, now())`;
   await item("2024-02-01T12:00:00Z");
-  await assert.rejects(composeDueReports(new Date("2024-02-02T03:00:00Z")), /reports:/);
+  const result = await composeDueReports(new Date("2024-02-02T03:00:00Z"));
+  assert.deepEqual(result.failed, [], "expected empty windows are skipped, not failures");
+  assert.deepEqual(result.generated, ["daily:2024-02-02", "weekly:2024-W04", "monthly:2024-01"]);
   for (const [kind, key] of [["daily", "2024-02-02"], ["weekly", "2024-W04"], ["monthly", "2024-01"]]) {
     assert.ok(await report(kind!, key!), `${kind} ${key} was recovered past the empty gaps`);
   }

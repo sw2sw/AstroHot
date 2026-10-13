@@ -66,7 +66,7 @@ The current reference rule scores each participating article twice separately an
 |---|---|---:|
 | T1 | Official first-hand sources | 60 |
 | T1_5 | Official accounts, quasi-official creators | 65 |
-| T2 | Media and individuals | 76 |
+| T2 | Media and individuals | 70 |
 
 `EXCLUDE_MP` and tiers not listed in the threshold table do not participate in featured scoring and follow only their corresponding full-updates paths. Not being featured does not mean not being displayed: articles meeting normal relevance and public-eligibility requirements may appear in the full updates feed.
 
@@ -78,7 +78,7 @@ The normal pipeline is: analysis completes → initial publication → automatic
 
 Automatic selection requires all of the following:
 - An editorial article has relevance PASS, a complete Chinese title and summary, and satisfies normal publishable-material rules.
-- The two scores sum to at least twice the tier threshold; for T2 this means at least152, or a mean of at least76.
+- The two scores sum to at least twice the tier threshold; for T2 this means at least140, or a mean of at least70.
 - Identity/grouping is complete and `selection_adds_value` is not false. A new article cannot bypass this condition merely by meeting the score threshold.
 
 Manual selection settings can override the automatic scoring-based decision, but do not bypass public eligibility or visibility. The website featured read layer also requires a public publication with `visible_after` reached; the machine interface separately filters representative seats for the same event. These outputs must not be treated as identical lists.

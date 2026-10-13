@@ -35,6 +35,18 @@ export function dailyMetrics(main: EditionEntry[]) {
 
 type ReportKind = "daily" | "weekly" | "monthly";
 
+/** No eligible inputs for an issue: scheduled runs skip it; explicit composition reports why. */
+export class EmptyReportInputError extends Error {
+  readonly kind: ReportKind;
+  readonly key: string;
+  constructor(kind: ReportKind, key: string) {
+    super(`${kind} ${key}: ${kind === "daily" ? "no selected items in its window" : "no daily entries in the period"}`);
+    this.name = "EmptyReportInputError";
+    this.kind = kind;
+    this.key = key;
+  }
+}
+
 /** How many events an issue already published carries; nothing when it does not exist yet. */
 async function savedReport(kind: ReportKind, key: string) {
   const [row] = await sql<{ entries: number }[]>`
@@ -77,8 +89,8 @@ export async function composeDaily(date: string, reason?: string): Promise<{ key
   const end = new Date(beijingMidnight(date).getTime() + 8 * 3600 * 1000);
   const start = new Date(end.getTime() - 86400000);
   const edition = await dailyEdition(date, start, end);
-  // An issue with nothing in it is a failure upstream, not a report: the run fails and is caught up later.
-  if (edition.entries.length === 0) throw new Error(`daily ${date}: no selected items in its window`);
+  // Never publish an empty issue; a scheduled run may retry this window when inputs arrive.
+  if (edition.entries.length === 0) throw new EmptyReportInputError("daily", date);
   const issue = arrangeDaily(edition.entries);
   const [lead, ...rest] = issue.main as [EditionEntry, ...EditionEntry[]];
   const content = {
@@ -181,7 +193,7 @@ async function composePeriod(kind: "weekly" | "monthly", key: string, startDate:
   const end = new Date(beijingMidnight(endDateInclusive).getTime() + 8 * 3600 * 1000);
   const { entries, issues } = await periodEntries(startDate, endDateInclusive);
   const top = entries.slice(0, PERIOD_EVENTS[kind]);
-  if (!top.length) throw new Error(`${kind} ${key}: no daily entries in the period`);
+  if (!top.length) throw new EmptyReportInputError(kind, key);
   const selected = await candidates(start, end);
   const groups = SECTION_ORDER
     .map((label) => ({ label, items: top.filter((e) => sectionOf(e.category) === label) }))
@@ -279,7 +291,7 @@ const nextMonth = (label: string) => {
  * The scheduled run (every half hour): every issue due by `now` that does not exist yet, oldest first.
  * The newest one appears at the first run after it falls due (above); a long stop or an older gap is
  * filled too. A kind with no issue yet only gets its latest due one. An issue that fails does not hold
- * up the others; at most `limit` issues are written per run, the next run continues.
+ * up the others; empty inputs are skipped. At most `limit` issues are written per run, the next run continues.
  */
 export async function composeDueReports(now = new Date(), limit = 8): Promise<{ generated: string[]; failed: string[] }> {
   const generated: string[] = [];
@@ -299,6 +311,7 @@ export async function composeDueReports(now = new Date(), limit = 8): Promise<{ 
         await k.compose(key);
         generated.push(`${k.kind}:${key}`);
       } catch (error) {
+        if (error instanceof EmptyReportInputError) continue;
         failed.push(`${k.kind}:${key}`);
         console.error(JSON.stringify({ level: "error", msg: "report failed", report: `${k.kind}:${key}`, error: String(error).slice(0, 300) }));
       }

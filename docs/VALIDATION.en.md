@@ -20,8 +20,14 @@ Checked on 2026-10-12 against an independently extracted sanitized snapshot and 
 - Independent `npm run typecheck` still reports **8 errors**, not a pass.
 - The author's full backend run reported **1035 passed, 35 failed, 4 cancelled, 2 skipped**. The coordinator did not repeat the entire backend suite for this first snapshot; new safety regressions do not fix those failures.
 - The coordinator's Docker build was blocked by a Docker Hub connection reset. Startup acceptance instead used installed Node and an isolated database. Author-reported Docker/Compose checks remain author evidence, not an independent rerun.
-- The empty-database worker records daily/weekly/monthly composition failures when no selected items or daily entries exist. These are not external model calls or installation failures; do not claim that all scheduled tasks succeeded.
+- Historical first-snapshot observation: the empty-database worker treated missing eligible inputs as composition failures. The incremental update below now skips expected empty inputs; this does not make unrelated failures or all scheduled tasks successful.
 - The GitHub CI template is not a green guarantee: known type errors block later steps; its database parameters and excluded-test policy need collaborator review. An initial push does not complete CI acceptance.
 - Fonts include their licence. Distributing built images/front-end bundles still requires applicable dependency copyrights, NOTICE and source-provision obligations for the actual artifacts. This source snapshot is not a legal conclusion about every binary dependency.
 
 See [TODO](TODO.en.md) for priorities and [known issues](../KNOWN-ISSUES.en.md) for defects and capacity boundaries. Internal logs, credentials and operational evidence are not published in the software repository.
+
+## 2026-10-13 incremental update
+
+- T2 selection threshold is now 70 (two-score sum at least 140); T1=60, T1_5=65 and understandFloor=50 are unchanged. No historical news scoring is automatically rerun.
+- Expected empty report inputs use `EmptyReportInputError`; scheduled composition skips that type before report writes or model admission. Explicit empty composition still refuses publication. Database/model-routing/commit errors remain failures; the existing model-response warning/fallback behavior is unchanged.
+- The sanitized incremental tree passed 7 offline composition-boundary regressions. This scoped check used synthetic I/O, not production data, a real model, full backend regression, a Web rebuild or Docker acceptance. Existing validation limitations above remain.
