@@ -2,13 +2,13 @@
 
 [中文](DEPLOYMENT.md) | [English](DEPLOYMENT.en.md)
 
-> Deployment reference for the private collaboration snapshot: these commands do not establish independent installation acceptance of this snapshot. Author evidence is retained; scoped native Linux startup, empty-database migration and key-path acceptance passed independently. Independent Docker validation was blocked by network access; see [validation scope](VALIDATION.en.md). No full-suite pass is claimed. See [known issues](../KNOWN-ISSUES.en.md) for test/type-check gaps and [TODO](TODO.en.md) for P0 gates. No one-click success guarantee is provided.
+> Project deployment reference: these commands do not establish independent installation acceptance of this snapshot. Author evidence is retained; scoped native Linux startup, empty-database migration and key-path acceptance passed independently. Independent Docker validation was blocked by network access; see [validation scope](VALIDATION.en.md). No full-suite pass is claimed. See [known issues](../KNOWN-ISSUES.en.md) for test/type-check gaps and [TODO](TODO.en.md) for P0 gates. No one-click success guarantee is provided.
 
 ## 1. Prerequisites and Safe Defaults
 
 The reference source code uses Node.js >=24.11, npm workspaces, and PostgreSQL; the container configuration uses PostgreSQL 17. The Docker approach requires Docker Engine and Compose; the native approach requires separately supervising the API, worker, and Web processes. Build resource requirements vary by version: check them in an isolated environment first rather than claiming fixed minimum machine specifications.
 
-Obtain this project's official release package/release tag; the collaboration repository is <https://github.com/sw2sw/AstroHot> (currently private and not yet publicly released). This document does not treat the upstream AIHOT repository address as the AstroHot release address. Read LICENSE, NOTICE, and the [content-rights explanation](CONTENT-RIGHTS.en.md).
+Obtain source from <https://github.com/sw2sw/AstroHot>, or choose a release package/tag if provided; record the full commit for reproducibility. Public repositories can be cloned anonymously, while private repositories or private forks require appropriate access. This document does not treat the upstream AIHOT repository address as the AstroHot release address. Read LICENSE, NOTICE, and the [content-rights explanation](CONTENT-RIGHTS.en.md).
 
 Create `.env` from the final safe template; do not copy private deployment configuration. Generate a separate administrator password (the reference requirement is at least 12 characters) and session, image-signing, and database secrets, for example using `openssl rand -hex 32` to generate random values. Do not put generated values in the public repository or log attachments.
 

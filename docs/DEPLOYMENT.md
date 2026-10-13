@@ -2,13 +2,13 @@
 
 [中文](DEPLOYMENT.md) | [English](DEPLOYMENT.en.md)
 
-> 私密协作快照的部署参考：下列命令尚不构成当前快照的独立安装验收。已有作者验证结果；本轮独立 Linux 原生启动、空库迁移与关键路径已完成，Docker 独立复验受网络阻塞，详见[验证范围](VALIDATION.md)。不宣称全量通过。已知测试/类型缺口见[已知问题](../KNOWN-ISSUES.md)，P0 见[TODO](TODO.md)。不提供一键成功保证。
+> 项目部署参考：下列命令尚不构成当前快照的独立安装验收。已有作者验证结果；本轮独立 Linux 原生启动、空库迁移与关键路径已完成，Docker 独立复验受网络阻塞，详见[验证范围](VALIDATION.md)。不宣称全量通过。已知测试/类型缺口见[已知问题](../KNOWN-ISSUES.md)，P0 见[TODO](TODO.md)。不提供一键成功保证。
 
 ## 1. 前提与安全默认
 
 参考源码使用Node.js >=24.11、npm workspaces、PostgreSQL，容器配置使用PostgreSQL 17。Docker方式需要Docker Engine与Compose；原生方式需要分别守护API、worker、Web三个进程。构建资源需求随版本而变，先在隔离环境检查，不宣称固定最低机器配置。
 
-获取本项目的正式发布包/发布标签；协作仓库为 <https://github.com/sw2sw/AstroHot>（当前为私密仓库、尚未公开发布）。本文不把上游AIHOT仓库地址当成AstroHot发行地址。阅读LICENSE、NOTICE及[内容版权说明](CONTENT-RIGHTS.md)。
+从项目仓库 <https://github.com/sw2sw/AstroHot> 获取源码，或选择已提供的发布包/标签；需要复现时记录完整提交号。公开仓库可匿名克隆，私有仓库或私有 fork 须按其访问权限认证。本文不把上游AIHOT仓库地址当成AstroHot发行地址。阅读LICENSE、NOTICE及[内容版权说明](CONTENT-RIGHTS.md)。
 
 从最终安全模板建立`.env`，不要复制私有部署配置。生成独立管理员密码（参考要求至少12位）与会话、图片签名、数据库密钥，例如使用`openssl rand -hex 32`生成随机值。不得把生成结果写进公开仓库或日志附件。
 

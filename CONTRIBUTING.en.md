@@ -2,7 +2,7 @@
 
 [中文](CONTRIBUTING.md) | [English](CONTRIBUTING.en.md)
 
-Collaboration target: <https://github.com/sw2sw/AstroHot>, currently a private first-release snapshot, not publicly released. Chinese and English contributions are welcome. Upstream AIHOT maintenance, CI or branch-protection policies are not guarantees about this project.
+Project repository: <https://github.com/sw2sw/AstroHot>. Documentation, reproducible issue reports, and narrow PRs in Chinese or English are welcome. CI, branch protection, and maintenance commitments follow this project's actual configuration, not policies inherited from upstream AIHOT.
 
 ## Issues and PRs
 

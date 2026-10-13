@@ -2,7 +2,7 @@
 
 [中文](CONTRIBUTING.md) | [English](CONTRIBUTING.en.md)
 
-协作目标：<https://github.com/sw2sw/AstroHot>，目前为私密首版快照，尚未公开发布。贡献中文或英文均可；不把上游 AIHOT 的维护、CI 或分支保护政策当作本项目已配置的保证。
+项目仓库：<https://github.com/sw2sw/AstroHot>。欢迎中文或英文的文档、可复现问题和小范围 PR；CI、分支保护及维护承诺以本项目实际配置为准，不直接继承上游 AIHOT 的政策。
 
 ## 提交问题与 PR
 

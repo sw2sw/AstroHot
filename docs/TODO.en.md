@@ -2,15 +2,15 @@
 
 [中文](TODO.md) | [English](TODO.en.md)
 
-## P0: first-release gates
+## P0: release gates
 
-Do not label the snapshot ready for public release while these remain incomplete. Private collaboration upload still requires privacy and upload-scope review. Each checked item needs a matching version and actual evidence; this list is not a completion claim.
+Recheck these privacy, licensing, and safety gates for each release. Documentation updates do not authorize repository-visibility changes or deployment. Each checked item needs a matching version and actual evidence; this is not an all-tests-pass claim.
 
 - [x] Remove real credentials, private IPs/accounts/environments and operational records. Actual leaks require authorized revocation/rotation; fresh history is not remediation.
 - [x] Review redistribution rights for software and bundled assets; retain MIT, NOTICE, font and applicable dependency licences. Exclude operational content and unauthorized third-party materials.
 - [x] Verify safe defaults: collection, models, analysis/reports, imagery tasks and push disabled; separate strong passwords/signing secrets, no weak database fallback.
 - [x] The main assistant independently accepts installation, migrations, safe startup and agreed key paths in this snapshot, with failures, exclusions and scope stated; do not claim an independent full-suite pass.
-- [x] This private collaboration snapshot is frozen and its upload scope reviewed; repeat checks for later updates. Only authorized private collaboration; no automatic public visibility or deployment.
+- [x] The initial sanitized source tree and subsequent incremental upload scopes have been reviewed; recheck each new release. Maintainers confirm repository visibility separately; this check does not make it public or deploy it automatically.
 ## Known verification gaps: not a pass list
 
 The table distinguishes original author evidence from the coordinator's actual execution; see [validation scope](VALIDATION.en.md):
