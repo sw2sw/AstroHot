@@ -8,8 +8,18 @@ export interface ArxivPaper {
   title_zh: string;
   authors: string[];
   categories: string[];
-  submitted_at: string;
-  updated_at: string;
+  /**
+   * The API's submission/update instants, or null when the record was read out of the official RSS
+   * announcement feed, which states neither. Null is a real answer here and is rendered as "unknown";
+   * it is never filled in from the announcement day, the ID's month or the collection timestamp.
+   */
+  submitted_at: string | null;
+  updated_at: string | null;
+  /**
+   * The announcement day the source stated (arxiv:announce_type/pubDate), present whenever the record
+   * has announcement evidence. For an RSS-sourced record this is the ONLY honest day there is.
+   */
+  announced_on?: string | null;
   url: string;
   verdict: ArxivVerdict;
   study_type: ArxivStudyType;

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { sql } from "../db.ts";
 import type { Tx } from "../db.ts";
 import type { RawArxivPaper } from "./collect.ts";
-import { readPendingRawArxivPapers } from "./raw-store.ts";
+import { lockArxivIdentity, readPendingRawArxivPapers } from "./raw-store.ts";
 import type { PendingRawArxivPaper } from "./raw-store.ts";
 import { importArxivReport } from "./store.ts";
 import { ModelOutputError, chatJson } from "../providers/llm.ts";
@@ -108,8 +108,18 @@ export interface AnalyzeArxivResult {
 
 // Source identity and original metadata always come from the raw row; only the seven screening fields
 // come from the model. The single-item report satisfies validateArxivReport.
+//
+// A record read out of the RSS announcement feed states no submission/update instant. Those travel
+// through as null, together with the announcement day the feed DID state, so the report is honest
+// about which day it really knows instead of inventing one — validateArxivReport accepts exactly this
+// shape and refuses a null date with no announcement day beside it.
+function announcedDayOf(meta: RawArxivPaper): string | undefined {
+  const value = (meta as { announced_on?: unknown }).announced_on;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
 function buildReport(raw: PendingRawArxivPaper, meta: RawArxivPaper, answer: ModelAnswer, now: Date) {
   const verdict = answer.verdict;
+  const announcedOn = announcedDayOf(meta);
   return {
     schema_version: 1,
     report_type: "arxiv_astronomy_screening",
@@ -147,6 +157,7 @@ function buildReport(raw: PendingRawArxivPaper, meta: RawArxivPaper, answer: Mod
         categories: [...meta.categories],
         submitted_at: meta.submitted_at,
         updated_at: meta.updated_at,
+        ...(announcedOn === undefined ? {} : { announced_on: announcedOn }),
         url: meta.url,
         verdict,
         study_type: answer.study_type,
@@ -169,7 +180,7 @@ function buildReport(raw: PendingRawArxivPaper, meta: RawArxivPaper, answer: Mod
  * upstream transport faults; a budget that is spent, a lost claim and a database business-write
  * failure are BUSINESS states with their own codes — never "transport". Only a failure that actually
  * reached the provider — or a genuinely unusable answer — is an error of the transport/output kind.
- * The codes match the allow-list in docs/ERROR-RECORDING.md.
+ * The codes match the allow-list in docs/ops-errors.md.
  */
 function classifyAnalysisFailure(error: unknown, phase: "claim" | "model" | "write"): {
   code: string; severity: "error" | "warning"; kind: string; preserveClaim: boolean;
@@ -261,7 +272,18 @@ export async function analyzePendingArxiv(
     try {
       // Claim only if the raw row is still pending with this exact metadata hash; the insert commits
       // on its own, so no connection is held while the model runs.
-      const claim = await sql`
+      //
+      // The admission is decided in ONE statement under the same per-paper boundary the other writer of
+      // this identity uses (a creator correction, on either source). Two things that used to be decided
+      // elsewhere are re-checked HERE, because "elsewhere" was a different read:
+      //   * an unresolved scientific conflict. The pending read already refuses one, but the conflict
+      //     can be committed AFTER that read and BEFORE this claim — a version whose science became
+      //     disputed in the meantime must not start a new paid call (§RSS-U2 F1);
+      //   * the per-paper lock itself, so a correction cannot be adopted in the middle of this decision
+      //     (raw-store `lockArxivIdentity`).
+      const claim = await sql.begin(async (tx) => {
+        await lockArxivIdentity(tx, raw.arxiv_id);
+        return await tx`
         INSERT INTO arxiv_analysis_claims (arxiv_id, metadata_hash, token, claimed_at)
         SELECT p.arxiv_id, p.metadata_hash, ${token}, clock_timestamp()
         FROM arxiv_raw_papers p
@@ -272,8 +294,11 @@ export async function analyzePendingArxiv(
             AND (r.blocked_reason IS NOT NULL OR r.next_attempt_at>clock_timestamp()))
           AND (SELECT coalesce(sum(r.validation_failures),0) FROM arxiv_analysis_retry r
             WHERE r.arxiv_id=p.arxiv_id AND r.metadata_hash=p.metadata_hash)<3
+          AND NOT EXISTS(SELECT 1 FROM arxiv_same_version_conflicts v
+            WHERE v.arxiv_id=p.arxiv_id AND v.resolved_at IS NULL AND v.defers_analysis)
         ON CONFLICT (arxiv_id) DO NOTHING
         RETURNING arxiv_id`;
+      });
       if (claim.length === 0) {
         result.skipped += 1;
         continue;
@@ -312,16 +337,26 @@ export async function analyzePendingArxiv(
           WHERE base_id = ${raw.base_id} AND version > ${raw.version}
           LIMIT 1`;
         if (newer.length > 0) return "obsolete";
-        await importArxivReport(report, { begin: <T>(fn: (t: Tx) => Promise<T>) => fn(tx) });
-        await tx`
+        // The row this run was keyed on must still BE the pending row with the document the model was
+        // given. An adopted creator correction moves the hash while the model is running, and the answer
+        // then belongs to a document that is no longer stored: it is not applied to the corrected row
+        // and the completion is not reported, because the run did not complete the work it claims. The
+        // stored row keeps its new identity and is left pending for the run that owns THAT document; the
+        // answer is not thrown away, the run simply does not get to call itself a completed analysis.
+        // (The per-paper boundary in the claim above is what keeps this from happening in the first
+        // place; this is the honest guard for the case where it did.)
+        const completed = await tx`
           UPDATE arxiv_raw_papers SET analysis_status = 'analyzed'
           WHERE arxiv_id = ${raw.arxiv_id}
             AND metadata_hash = ${raw.metadata_hash}
-            AND analysis_status = 'pending'`;
+            AND analysis_status = 'pending'
+          RETURNING arxiv_id`;
+        if (completed.length === 0) return "superseded";
+        await importArxivReport(report, { begin: <T>(fn: (t: Tx) => Promise<T>) => fn(tx) });
         await completeReceipt(tx, receiptId);
         return "analyzed";
       });
-      if (outcome === "obsolete") result.skipped += 1;
+      if (outcome === "obsolete" || outcome === "superseded") result.skipped += 1;
       else result.analyzed += 1;
     } catch (error) {
       // A received answer may be replayed after a business-write failure. An in-doubt request must

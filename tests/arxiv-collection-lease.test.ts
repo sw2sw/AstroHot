@@ -3,6 +3,13 @@
 // it is renewed before every request, it stays alive while a request is in flight, and a lease that was
 // taken over fails closed instead of committing an answer it no longer owns.
 import './setup.ts';
+
+// This file drives the OPTIONAL API supplement. The ordinary round is RSS-primary and touches the
+// export API zero times, so a test that is about the API path has to ask for it explicitly.
+process.env.ARXIV_API_SUPPLEMENT_ENABLED='true';
+// This file drives the LEGACY ordinary submission-date window. It is a separate, default-off switch
+// from the API supplement (RSS-U3): asking for the gap-fill must not bring the window back.
+process.env.ARXIV_API_WINDOW_ENABLED='true';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
