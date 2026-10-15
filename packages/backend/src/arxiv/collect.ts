@@ -8,8 +8,14 @@ export interface RawArxivPaper {
   abstract_original: string;
   authors: string[];
   categories: string[];
-  submitted_at: string;
-  updated_at: string;
+  /**
+   * The API's `published`/`updated` instants. The official RSS announcement feed states no such
+   * fields, so a raw paper read out of that feed carries null here — an unknown date stays unknown
+   * and is never synthesized from the announcement day, the ID's month or the collection timestamp.
+   * A consumer that needs a day reads the announcement day instead (see rss-paper.ts).
+   */
+  submitted_at: string | null;
+  updated_at: string | null;
   url: string;
 }
 

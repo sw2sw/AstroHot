@@ -120,7 +120,8 @@ export async function withModelAdmission<T>(url: string, purpose: string, subjec
   const provider = providerPacing(parsed);
   // A fresh query embedding is immediately followed by reranking; normal provider
   // spacing must not make that optional step silently fall back on every article.
-  const waitMs = provider.name === 'agnes' ? DEFAULT_WAIT_MS : Math.min(provider.intervalMs + 250, 11_000);
+  // The bound must stay usable when an origin imposes no spacing at all.
+  const waitMs = provider.name === 'agnes' ? DEFAULT_WAIT_MS : Math.min(Math.max(provider.intervalMs + 250, DEFAULT_WAIT_MS), 11_000);
   const token = await acquireModelPermit(purpose, subject, { provider, waitMs, signal: shutdownSignal.signal });
   const admission: Admission = { token, url, purpose, subject, used: false };
   try {
@@ -172,7 +173,7 @@ export async function modelFetch(url: string, init: ModelRequestInit, purpose: s
   const token = admission && !admission.used ? admission.token : await acquireModelPermit(purpose, subject, {
     signal: waitSignal,
     provider,
-    waitMs: provider.name === 'agnes' || provider.name === 'siliconflow' ? DEFAULT_WAIT_MS : Math.min(provider.intervalMs + 250, 11_000),
+    waitMs: provider.name === 'agnes' || provider.name === 'siliconflow' ? DEFAULT_WAIT_MS : Math.min(Math.max(provider.intervalMs + 250, DEFAULT_WAIT_MS), 11_000),
   });
   if (admission && !admission.used) admission.used = true;
   let requestSignal: AbortSignal;

@@ -20,16 +20,23 @@ declare global { var IS_REACT_ACT_ENVIRONMENT: boolean }
 // ROUND4 D5 is about. React's scheduler may reuse setTimeout for very short delays, so only the
 // hook's cadence is inspected.
 const realSetTimeout = globalThis.setTimeout;
-const scheduled: Array<{ fn: () => void; delay: number }> = [];
+const scheduled: Array<{ fn: () => void; delay: number; id: ReturnType<typeof setTimeout> }> = [];
 function captureTimers() {
   scheduled.length = 0;
   (globalThis as Record<string, unknown>).setTimeout = ((fn: () => void, delay?: number) => {
+    // Only intercept the hook cadence; React's short scheduling timers must stay real.
+    if (delay !== 120_000) return realSetTimeout(fn, delay);
     const id = realSetTimeout(() => {}, 2_147_483_647);
-    scheduled.push({ fn, delay: delay ?? 0 });
+    id.unref(); // a captured fake must never keep the test worker alive
+    scheduled.push({ fn, delay, id });
     return id;
   }) as unknown as typeof setTimeout;
 }
-function releaseTimers() { (globalThis as Record<string, unknown>).setTimeout = realSetTimeout; }
+function releaseTimers() {
+  (globalThis as Record<string, unknown>).setTimeout = realSetTimeout;
+  for (const timer of scheduled) clearTimeout(timer.id);
+  scheduled.length = 0;
+}
 /** The hook's own cadence occurrences captured since the last captureTimers(). */
 const cadence = () => scheduled.filter((s) => s.delay === 120_000);
 

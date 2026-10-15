@@ -23,11 +23,21 @@ test('real saved official authors-only update adopts latest metadata/hash offlin
  const updates:unknown[][]=[]; const retryMigrations:unknown[][]=[];
  const tx=async(strings:TemplateStringsArray,...values:unknown[])=>{
   const q=strings.join('?');
+  const claimsActive=false;
+  // The per-paper serialization boundary (RSS-U2 F2) is part of the adoption path now: the
+  // offline fake harness grants it as the no-op it is offline.
+  if(q.includes('pg_advisory_xact_lock'))return [];
   if(q.includes('INSERT INTO arxiv_raw_batches'))return [{content_hash:'offline'}];
   if(q.includes('INSERT INTO arxiv_raw_papers'))return [];
+  if(q.includes('SELECT') && q.includes('metadata, metadata_hash, source FROM arxiv_raw_papers'))return [{metadata_hash:rawMetadataDigest(old),metadata:old}];
+  // The adoption is one CAS statement now (RSS-U2 F2): the fake emulates the row-level
+  // predicate it can see. With no claim it returns the adopted row; with a live claim the
+  // real statement's NOT EXISTS refuses, so nothing is recorded as persisted.
+  if(q.includes('UPDATE arxiv_raw_papers')){
+   if(claimsActive) return []; // the row predicate refuses: nothing is persisted, nothing recorded
+   updates.push(values); return [{arxiv_id:old.arxiv_id}];
+  }
   if(q.includes('SELECT 1 FROM arxiv_analysis_claims'))return [];
-  if(q.includes('SELECT') && q.includes('metadata_hash FROM arxiv_raw_papers'))return [{metadata_hash:rawMetadataDigest(old),metadata:old}];
-  if(q.includes('UPDATE arxiv_raw_papers')){updates.push(values);return [];}
   if(q.includes('UPDATE arxiv_analysis_retry')){retryMigrations.push(values);return [];}
   throw Error('Unexpected SQL: '+q);
  };
@@ -43,11 +53,21 @@ test('offline: an active paid-analysis claim defers the authors-only adoption',a
  const updates:unknown[][]=[];
  const tx=async(strings:TemplateStringsArray,...values:unknown[])=>{
   const q=strings.join('?');
+  const claimsActive=true;
+  // The per-paper serialization boundary (RSS-U2 F2) is part of the adoption path now: the
+  // offline fake harness grants it as the no-op it is offline.
+  if(q.includes('pg_advisory_xact_lock'))return [];
   if(q.includes('INSERT INTO arxiv_raw_batches'))return [{content_hash:'offline'}];
   if(q.includes('INSERT INTO arxiv_raw_papers'))return [];
+  if(q.includes('SELECT') && q.includes('metadata, metadata_hash, source FROM arxiv_raw_papers'))return [{metadata_hash:rawMetadataDigest(old),metadata:old}];
+  // The adoption is one CAS statement now (RSS-U2 F2): the fake emulates the row-level
+  // predicate it can see. With no claim it returns the adopted row; with a live claim the
+  // real statement's NOT EXISTS refuses, so nothing is recorded as persisted.
+  if(q.includes('UPDATE arxiv_raw_papers')){
+   if(claimsActive) return []; // the row predicate refuses: nothing is persisted, nothing recorded
+   updates.push(values); return [{arxiv_id:old.arxiv_id}];
+  }
   if(q.includes('SELECT 1 FROM arxiv_analysis_claims'))return [{'?column?':1}];
-  if(q.includes('SELECT') && q.includes('metadata_hash FROM arxiv_raw_papers'))return [{metadata_hash:rawMetadataDigest(old),metadata:old}];
-  if(q.includes('UPDATE arxiv_raw_papers')){updates.push(values);return [];}
   throw Error('Unexpected SQL: '+q);
  };
  const result=await ingestRawArxivCollection(input(newXml),{begin:fn=>fn(tx as never)});

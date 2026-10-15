@@ -163,6 +163,10 @@ export interface HydrationBatchResult {
   recordedExceptionCount: number;
   resolvedExceptionCount: number;
   deferredAuthorUpdates: string[];
+  // Versions this answer carried whose row is already stored from the official announcement feed.
+  // The feed's document is the one being analyzed, so the Atom record is additional evidence for the
+  // same identity and never a rewrite (see persistRawArxivRows).
+  crossSourceOverlaps: string[];
 }
 
 // The page counters are best effort: the OpenSearch block is optional in a hydration answer.
@@ -229,7 +233,7 @@ export async function ingestHydratedArxivBatch(
     // Unlike the whole-page ingest this never short-circuits on an already stored batch: a recovery
     // refetch normally replays the same document, and the previously missing version still has to be
     // inserted.
-    const { deferredAuthorUpdates, insertedIds } = await persistRawArxivRows(
+    const { deferredAuthorUpdates, insertedIds, crossSourceOverlaps } = await persistRawArxivRows(
       tx,
       validated.batchHash,
       validated.collectedAt,
@@ -277,6 +281,7 @@ export async function ingestHydratedArxivBatch(
       recordedExceptionCount,
       resolvedExceptionCount: resolved.length,
       deferredAuthorUpdates,
+      crossSourceOverlaps,
     };
   });
 }

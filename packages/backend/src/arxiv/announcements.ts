@@ -43,7 +43,34 @@ export function arxivIdentity(id: string): { baseId: string; version: number } {
   if (!Number.isSafeInteger(version) || version > 2147483647) throw new Error('arXiv version out of range');
   return { baseId: match[1]!, version };
 }
-function batchDay(value: string): string {
+/**
+ * The identity the publisher itself prints at the head of an item's description:
+ * `arXiv:<versioned id> Announce Type: <type>`.
+ *
+ * The feed's scaffolding is not decoration — it NAMES the paper the description is about. An item whose
+ * canonical guid says one identity while its own description announces another would otherwise have a
+ * complete, plausible-looking abstract stored under the wrong identifier, which is exactly the kind of
+ * silent identity corruption the design's red lines exist to prevent. Only a prefix in this exact
+ * official shape is read: free-form scientific text is never scanned for identity, so it can neither be
+ * mistaken for one nor "cleaned" into one.
+ *
+ * Exported so the RSS-native paper reader can state the same reading, and undefined is meaningful: it
+ * means the document claimed no identity at all (a legitimate absence handled per item downstream).
+ */
+export function descriptionIdentity(description: string):
+  { id: string; announceType: string } | undefined {
+  const match = /^\s*arXiv:\s*(\S+)\s+Announce\s+Type:\s*([A-Za-z][A-Za-z-]*)\b/.exec(description);
+  return match === null ? undefined : { id: match[1]!, announceType: match[2]! };
+}
+/**
+ * The SOURCE calendar day of an RFC-822 announcement date. The feed publishes in US Eastern time
+ * (-0400/-0500), and the day it names is the announcement's own day, so the offset is validated but
+ * never used to convert: an announcement dated 20:00 -0400 belongs to that same named day.
+ *
+ * Exported because the RSS-native paper reader validates its items against exactly this reading of
+ * `pubDate` — one function, so the two entries can never disagree about which day they saw.
+ */
+export function batchDay(value: string): string {
   const m = /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat), (\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) ([+-])(\d{2})(\d{2})$/.exec(value);
   if (!m) throw new Error('Invalid RSS announcement date');
   const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(m[3]!) + 1;
@@ -84,6 +111,15 @@ export function parseArxivAnnouncements(xml: string): ArxivAnnouncement[] {
       return text(v);
     });
     if (types.length !== 1 || !TYPES.has(types[0]!)) throw new Error('RSS announcement type missing or unsupported');
+    // The description the publisher attached to THIS item states an identity too, and that identity has
+    // to be the one the canonical guid already named. A description announcing another base id, another
+    // version or another announcement type is a document that disagrees with itself: the whole batch is
+    // rejected, because the item could be stored as a complete-looking paper under the wrong identity.
+    const stated = descriptionIdentity(text(item.description));
+    if (stated !== undefined) {
+      if (stated.id !== id) throw new Error('RSS description identity disagrees with its canonical identifier');
+      if (stated.announceType !== types[0]) throw new Error('RSS description announcement type disagrees with the structured type');
+    }
     const date = batchDay(text(item.pubDate));
     const link = text(item.link);
     if (!link) throw new Error('RSS item original link missing');

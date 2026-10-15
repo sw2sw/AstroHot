@@ -1,4 +1,11 @@
 import './setup.ts';
+
+// This file drives the OPTIONAL API supplement. The ordinary round is RSS-primary and touches the
+// export API zero times, so a test that is about the API path has to ask for it explicitly.
+process.env.ARXIV_API_SUPPLEMENT_ENABLED='true';
+// This file drives the LEGACY ordinary submission-date window. It is a separate, default-off switch
+// from the API supplement (RSS-U3): asking for the gap-fill must not bring the window back.
+process.env.ARXIV_API_WINDOW_ENABLED='true';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -50,10 +57,12 @@ test('disabled guards cannot load or reach a database in a fresh process', () =>
  assert.equal(execFileSync(process.execPath,['--input-type=module','-e',code],{env:{...process.env,DATABASE_URL:'postgres://postgres@127.0.0.1:1/disabled_test'},timeout:5000,encoding:'utf8'}).trim(),'0');
 });
 test('native schedule requires both literal true flags and offsets analysis', () => {
- const schedules=(collect:string,native:string)=>JSON.parse(execFileSync(process.execPath,['--input-type=module','-e',"const {SCHEDULES}=await import('./apps/worker/src/schedules.ts'); console.log(JSON.stringify(SCHEDULES.filter(s=>s.name==='arxiv.collect').map(s=>({name:s.name,cron:s.cron,tz:s.tz,retryLimit:s.retryLimit}))));"],{env:{...process.env,COLLECT_ENABLED:collect,ARXIV_NATIVE_COLLECT_ENABLED:native,MODEL_CALLS_ENABLED:'false'},timeout:10000,encoding:'utf8'}));
+ const schedules=(collect:string,native:string)=>JSON.parse(execFileSync(process.execPath,['--input-type=module','-e',"const {SCHEDULES}=await import('./apps/worker/src/schedules.ts'); console.log(JSON.stringify(SCHEDULES.filter(s=>s.name==='arxiv.collect').map(s=>({name:s.name,cron:s.cron,tz:s.tz,retryLimit:s.retryLimit,record:s.record}))));"],{env:{...process.env,COLLECT_ENABLED:collect,ARXIV_NATIVE_COLLECT_ENABLED:native,MODEL_CALLS_ENABLED:'false'},timeout:10000,encoding:'utf8'}));
  for(const [c,n] of [['false','true'],['true','false'],['1','true'],['true','1'],['',''],['TRUE','true']]) assert.deepEqual(schedules(c!,n!),[]);
- // One first attempt at 01:00 UTC and two retries six hours apart, evaluated in UTC because the
- // daily attempt budget is a UTC-day budget, and no pg-boss retry of its own: an internal retry would
- // run seconds after a failure, outside the spacing and outside the budget.
- assert.deepEqual(schedules('true','true'),[{name:'arxiv.collect',cron:'0 1,7,13 * * *',tz:'UTC',retryLimit:0}]);
+ // A once-a-minute question against the durable due instant — the day's first attempt is anchored at
+ // 01:00 UTC and each retry is six real hours after the attempt it follows, so there is no fixed slot
+ // list left to drop whole. Evaluated in UTC because the daily attempt budget is a UTC-day budget, and
+ // no pg-boss retry of its own: an internal retry would run seconds after a failure, outside the
+ // spacing and outside the budget. `record: 'due'` keeps an idle minute out of job_runs.
+ assert.deepEqual(schedules('true','true'),[{name:'arxiv.collect',cron:'* * * * *',tz:'UTC',retryLimit:0,record:'due'}]);
 });

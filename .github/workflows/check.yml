@@ -61,7 +61,8 @@ jobs:
       - name: Build web
         run: npm run build -w @aihot/web
       - name: Web tests
-        run: node --test apps/web/tests/*.test.ts
+        timeout-minutes: 3
+        run: timeout --kill-after=5s 120s node --test --test-timeout=30000 apps/web/tests/*.test.ts
 
       # Each test file runs on its own copy of aihot_ci (tests/databases.ts), which the run migrates and
       # leaves empty; the smoke check then reads that empty database.

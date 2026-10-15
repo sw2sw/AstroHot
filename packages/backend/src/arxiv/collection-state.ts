@@ -144,25 +144,62 @@ async function boundedControlPlane<T>(
   finally { if(timer!==undefined) clearTimeout(timer); }
 }
 
-export async function claimCollection(now:Date):Promise<CollectionState|CollectionCooldown> {
+/**
+ * Claims the channel lease inside an ALREADY OPEN transaction. The scheduled entry calls this from the
+ * SAME transaction that spends the day's attempt, so a channel that is really busy — another worker, or
+ * the explicit hydration recovery entry — is refused BEFORE an attempt is spent, and there is no window
+ * between the budget admission and the lease claim for a second process to slip in.
+ *
+ * `at` is the authoritative instant the durable hold and the live term are compared against, and
+ * `windowNow` the instant the window bounds are computed from. The scheduled entry passes the SAME
+ * instant for both, so its budget and its lease share one clock; the legacy `claimCollection` keeps the
+ * database clock for the comparison and the caller's instant for the window, exactly as before.
+ *
+ * Unlike `claimCollection`, a live owner is RETURNED as `busy` rather than thrown: the caller is a
+ * transaction that must decide whether the day's attempt may be spent, and an exception would force it
+ * to guess.
+ */
+export async function claimCollectionWithin(
+  tx:Tx,
+  instant:{at:Date;windowNow:Date},
+):Promise<CollectionState|CollectionCooldown|CollectionBusy> {
   const owner=randomUUID();
-  return sql.begin(async tx=>{
-    await tx`INSERT INTO arxiv_collection_state(key) VALUES(${ARXIV_COLLECTION_KEY}) ON CONFLICT(key) DO NOTHING`;
-    const row=(await tx`SELECT *,lease_until > clock_timestamp() AS active FROM arxiv_collection_state WHERE key=${ARXIV_COLLECTION_KEY} FOR UPDATE`)[0]!;
-    // An ownerless future lease is the durable HTTP429 admission hold. Reuse the
-    // existing timestamp; old code also refuses admission until it expires.
-    if(row.active && row.owner===null) return {status:'skipped' as const,complete:false as const,nextEligibleAt:new Date(row.lease_until).toISOString()};
-    if(row.active) throw new Error('arXiv collection is busy in another process');
-    const todayUtc=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
-    // A missed schedule cannot silently initiate an unbounded historical backfill.
-    const from=row.window_from ?? queryMinute(new Date(row.completed_through
-      ? Math.max(new Date(row.completed_through).getTime()-86400000,todayUtc) : todayUtc));
-    const through=row.window_through ?? queryMinute(now);
-    if(from>through) throw new Error('arXiv collection clock moved backwards');
-    const claimed=await tx<CollectionState[]>`UPDATE arxiv_collection_state SET owner=${owner},lease_until=clock_timestamp()+make_interval(secs=>${ARXIV_LEASE_SECONDS}),
-      window_from=${from},window_through=${through} WHERE key=${ARXIV_COLLECTION_KEY} RETURNING *`;
-    return claimed[0]!;
+  await tx`INSERT INTO arxiv_collection_state(key) VALUES(${ARXIV_COLLECTION_KEY}) ON CONFLICT(key) DO NOTHING`;
+  const row=(await tx<{owner:string|null;lease_until:Date|null;active:boolean|null;completed_through:Date|null;
+      window_from:string|null;window_through:string|null}[]>`
+    SELECT owner,lease_until,completed_through,window_from,window_through,
+      lease_until > ${instant.at.toISOString()}::timestamptz AS active
+    FROM arxiv_collection_state WHERE key=${ARXIV_COLLECTION_KEY} FOR UPDATE`)[0]!;
+  // An ownerless future lease is the durable HTTP429 admission hold (or an operator's pause).
+  if(row.active && row.owner===null) {
+    return {status:'skipped' as const,complete:false as const,nextEligibleAt:new Date(row.lease_until!).toISOString()};
+  }
+  // A live owner is really working the channel: nobody else may take it, and no attempt may be spent.
+  if(row.active) {
+    return {status:'busy' as const,owner:row.owner!,nextEligibleAt:row.lease_until ? new Date(row.lease_until).toISOString() : null};
+  }
+  const now=instant.windowNow;
+  const todayUtc=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
+  // A missed schedule cannot silently initiate an unbounded historical backfill.
+  const from=row.window_from ?? queryMinute(new Date(row.completed_through
+    ? Math.max(new Date(row.completed_through).getTime()-86400000,todayUtc) : todayUtc));
+  const through=row.window_through ?? queryMinute(now);
+  if(from>through) throw new Error('arXiv collection clock moved backwards');
+  const claimed=await tx<CollectionState[]>`UPDATE arxiv_collection_state SET owner=${owner},lease_until=clock_timestamp()+make_interval(secs=>${ARXIV_LEASE_SECONDS}),
+    window_from=${from},window_through=${through} WHERE key=${ARXIV_COLLECTION_KEY} RETURNING *`;
+  return claimed[0]!;
+}
+
+export async function claimCollection(now:Date):Promise<CollectionState|CollectionCooldown> {
+  // The comparison instant is the DATABASE clock, as it always was for this entry point; the window
+  // still uses the caller's instant. A live owner keeps its historical contract: an exception, not a
+  // returned status, because every existing caller branches on the throw.
+  const claimed=await sql.begin(async tx=>{
+    const at=(await tx<{at:Date}[]>`SELECT clock_timestamp() AS at`)[0]!.at;
+    return claimCollectionWithin(tx,{at:new Date(at),windowNow:now});
   });
+  if('status' in claimed && claimed.status==='busy') throw new Error('arXiv collection is busy in another process');
+  return claimed;
 }
 
 /**

@@ -1,6 +1,7 @@
 // Cron-style schedules (Asia/Shanghai). Each run is recorded in job_runs; missed slots run once.
 import { syncArxivReport } from "@aihot/backend/arxiv/sync";
 import { collectScheduledArxiv } from "@aihot/backend/arxiv/collection-budget";
+import { collectionIsDue } from "@aihot/backend/arxiv/collection-due";
 import { analyzePendingArxiv } from "@aihot/backend/arxiv/analyze";
 import { composeArxivDailyReport } from "@aihot/backend/arxiv/daily";
 import { imageryDailyEnabled, runImageryDaily } from "@aihot/backend/imagery/daily";
@@ -40,8 +41,13 @@ interface Scheduled {
   tz?: string;
   // pg-boss retries a failed job inside its own queue. That is right for most entries, but a retry of
   // the arXiv collection would run seconds after the failed attempt instead of at the next six-hour
-  // slot, so that entry turns it off and relies on the durable daily budget instead.
+  // due instant, so that entry turns it off and relies on the durable daily budget instead.
   retryLimit?: number;
+  // How an invocation reaches job_runs. "always" (the default) records every run. "due" makes the
+  // entry a QUESTION rather than a run: the per-minute tick first reads the durable arXiv schedule and
+  // only becomes a job_runs row once the channel is really due, so an idle minute leaves no "ok"
+  // collection row for an operator to misread as a real attempt.
+  record?: "always" | "due";
 }
 
 const collecting = process.env.COLLECT_ENABLED === "true";
@@ -64,14 +70,17 @@ export const SCHEDULES: Scheduled[] = [
   ...(process.env.ARXIV_DAILY_REPORT_ENABLED === "true"
     ? [{ name: "arxiv.daily-report", cron: "7,37 * * * *", run: () => composeArxivDailyReport() }]
     : []),
-  // arXiv publishes the official feed once a day. The scheduled entry is the day's first attempt at
-  // 01:00 UTC, then a retry every six hours while nothing new came in — at most three attempts a day,
-  // counted durably, and closed as soon as an attempt actually collected something. The time zone is
-  // UTC on purpose: the budget is a UTC-day budget, so the slots must not slide with local time.
-  // retryLimit 0: a pg-boss retry would run seconds after the failure, outside the six-hour spacing
-  // and outside the daily budget, so the queue must not retry — the durable slot guard is the retry.
+  // arXiv publishes the official feed once a day. The durable due instant is the ONLY authority for
+  // when an attempt may run: the day's first attempt is anchored at 01:00 UTC and every retry is six
+  // real hours after the attempt it follows, so this entry is a plain once-a-minute question rather
+  // than a fixed 01/07/13 slot list — a fixed slot is dropped entirely whenever the attempt before it
+  // started a little late, which cost the day six hours and missed evening publications (see
+  // collection-due.ts). The time zone is UTC on purpose: the budget is a UTC-day budget, so the anchor
+  // must not slide with local time. retryLimit 0: a pg-boss retry would run seconds after the failure,
+  // outside the six-hour spacing and outside the daily budget, so the queue must not retry — the
+  // durable due instant is the retry. record "due": a minute that is not due leaves no run row.
   ...(collecting && process.env.ARXIV_NATIVE_COLLECT_ENABLED === "true"
-    ? [{ name: "arxiv.collect", cron: "0 1,7,13 * * *", tz: "UTC", retryLimit: 0, run: (runId: number) => collectScheduledArxiv({ jobRunId: runId }) }]
+    ? [{ name: "arxiv.collect", cron: "* * * * *", tz: "UTC", retryLimit: 0, record: "due" as const, run: (runId: number) => collectScheduledArxiv({ jobRunId: runId }) }]
     : []),
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },
   // Full-text translations of newly selected items (model calls; off with MODEL_CALLS_ENABLED=false).
@@ -128,7 +137,24 @@ export async function registerSchedules(boss: PgBoss) {
     await ensureQueue(queue, scheduleQueueOptions(s));
     await boss.schedule(queue, s.cron, {}, { tz: s.tz ?? DEFAULT_TZ, missed: s.missed ?? "skip" });
     // Schedules fire at minute boundaries; a 15 s pickup keeps them on time with a third of the polling.
-    await boss.work(queue, { pollingIntervalSeconds: 15 }, async () => recordRun(s.name, s.run));
+    await boss.work(queue, { pollingIntervalSeconds: 15 }, async () => {
+      // A "due" entry is a question before it is a run: an idle minute must not leave a job_runs row
+      // that reads like a successful collection. The read never writes and never reaches the source;
+      // the entry's own atomic admission remains the authority.
+      if (s.record === "due") {
+        try {
+          if (!(await collectionIsDue())) return undefined;
+        } catch (error) {
+          // The control-plane QUESTION itself failed — the schedule could not be read. That is an
+          // operator-visible fact, never an idle minute: recording it as a failed run keeps "the check
+          // could not be answered" from being read as "there was nothing to do", and it is the same
+          // evidence path every other failure uses.
+          await recordRun(s.name, async () => { throw error; }).catch(() => undefined);
+          return undefined;
+        }
+      }
+      return recordRun(s.name, s.run);
+    });
   }
   // pg-boss keys a schedule by its expression and time zone, so editing a schedule's cron leaves the
   // old key queued forever. Drop every cron entry that is gone from this list OR whose expression or

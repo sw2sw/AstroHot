@@ -8,7 +8,7 @@ import { createServer, type ViteDevServer } from "vite";
 import type { FeedItemSummary } from "@aihot/contracts/site";
 
 let vite: ViteDevServer;
-before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" }); });
+before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" }); });
 after(async () => { await vite?.close(); });
 const item: FeedItemSummary = {
   id: "news-1", title: "哈勃发现新线索", summary: "新闻摘要", reason: null,

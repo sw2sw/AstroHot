@@ -32,7 +32,13 @@ export async function loadArxivFeed(query: ArxivQuery, database?: Db): Promise<A
       SELECT CASE WHEN a.announced_on IS NULL THEN p.paper
                   ELSE p.paper || jsonb_build_object('announced_on', a.announced_on::text) END AS paper,
              p.base_id,
-             COALESCE(a.announced_on::text, to_char((p.paper->>'submitted_at')::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD')) AS display_day,
+             -- The day the reader can honestly name, from the most specific source to the least:
+             -- the stored 'new' announcement evidence, then the day the record itself carries (an
+             -- RSS-sourced record states one and states no submission instant), then the submission
+             -- day a record taken from the API can fall back on. A row that names no day at all
+             -- stays NULL and is never dressed up as the newest one.
+             COALESCE(a.announced_on::text, p.paper->>'announced_on',
+               to_char((p.paper->>'submitted_at')::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD')) AS display_day,
              (a.announced_on IS NOT NULL) AS has_announcement,
              (p.paper->>'submitted_at')::timestamptz AS submitted_at,
              p.admitted_at
@@ -41,10 +47,10 @@ export async function loadArxivFeed(query: ArxivQuery, database?: Db): Promise<A
         AND (${query.category}::text IS NULL OR (paper->'categories') ? ${query.category})
     ), page_items AS (
       SELECT paper, base_id, display_day, has_announcement, submitted_at FROM candidates
-      ORDER BY display_day DESC, has_announcement DESC, submitted_at DESC, base_id ASC
+      ORDER BY display_day DESC NULLS LAST, has_announcement DESC, submitted_at DESC NULLS LAST, base_id ASC
       LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}
     )
-    SELECT COALESCE((SELECT jsonb_agg(paper ORDER BY display_day DESC, has_announcement DESC, submitted_at DESC, base_id ASC) FROM page_items), '[]'::jsonb) AS items,
+    SELECT COALESCE((SELECT jsonb_agg(paper ORDER BY display_day DESC NULLS LAST, has_announcement DESC, submitted_at DESC NULLS LAST, base_id ASC) FROM page_items), '[]'::jsonb) AS items,
       (SELECT count(*)::integer FROM candidates) AS total,
       -- The reader-side new-content signal, computed over the WHOLE filtered set from rows this query
       -- already reads: no extra download, no change to the ordering.

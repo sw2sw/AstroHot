@@ -1,4 +1,11 @@
 import './setup.ts';
+
+// This file drives the OPTIONAL API supplement. The ordinary round is RSS-primary and touches the
+// export API zero times, so a test that is about the API path has to ask for it explicitly.
+process.env.ARXIV_API_SUPPLEMENT_ENABLED='true';
+// This file drives the LEGACY ordinary submission-date window. It is a separate, default-off switch
+// from the API supplement (RSS-U3): asking for the gap-fill must not bring the window back.
+process.env.ARXIV_API_WINDOW_ENABLED='true';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -45,7 +52,23 @@ for (const stage of ['rss','metadata','hydration'] as const) {
       if ((stage==='rss' && url.hostname==='rss.arxiv.org') || (stage==='metadata' && url.hostname==='export.arxiv.org') || (stage==='hydration' && url.searchParams.has('id_list'))) return new Response('rate limited',{status:429});
       return new Response(url.hostname==='rss.arxiv.org'?rss:atom);
     };
-    await assert.rejects(collectAndStoreArxiv({fetch:limited,now,sleep:async()=>{}}),/HTTP 429/);
+    const rateLimitedBefore=(await sql`SELECT count(*)::int n FROM ops_error_events WHERE stage='arxiv.collect' AND code='rate_limited'`)[0]!.n;
+    let thrown: unknown;
+    let ran: Awaited<ReturnType<typeof collectAndStoreArxiv>>;
+    try { ran = await collectAndStoreArxiv({fetch:limited,now,sleep:async()=>{}}); }
+    catch (error) { thrown = error; }
+    if (stage === 'hydration') {
+      // RSS-U4: a 429 during the SUPPLEMENT is an auxiliary failure. The shared hold is established
+      // first and the source stops, but the round is NOT rewritten as a total failure — what the feed
+      // stored keeps its result, and the 429 is recorded as the shared rate limit it is.
+      assert.equal(thrown, undefined, 'a supplement 429 leaves the round intact instead of failing it');
+      assert.equal(ran!.partial, true, 'the round says something was left behind');
+      assert.equal(ran!.complete, false);
+      assert.equal((await sql`SELECT count(*)::int n FROM ops_error_events WHERE stage='arxiv.collect' AND code='rate_limited'`)[0]!.n, rateLimitedBefore + 1,
+        'the shared hold is recorded as a rate limit, not demoted to a supplement failure');
+    } else {
+      assert.match(String(thrown), /HTTP 429/, 'a rate limit on the main path is never swallowed');
+    }
     assert.equal(hits.length,stage==='rss'?1:2,'429 aborts all remaining requests');
     const held=await row();
     assert.equal(held.owner,null);

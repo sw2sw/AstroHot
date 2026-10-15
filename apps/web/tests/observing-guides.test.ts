@@ -64,7 +64,7 @@ function renderHomeCard(today: string) {
 
 let vite: ViteDevServer;
 before(async () => {
-  vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" });
+  vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" });
 });
 after(async () => { await vite?.close(); });
 

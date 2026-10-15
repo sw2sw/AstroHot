@@ -128,7 +128,9 @@ function snapshot(input: unknown): ArxivReport {
       paper_key: p.paper_key, arxiv_id: p.arxiv_id,
       title_original: p.title_original, title_zh: p.title_zh,
       authors: copyArray(p.authors, `items[${i}].authors`), categories: copyArray(p.categories, `items[${i}].categories`),
-      submitted_at: p.submitted_at, updated_at: p.updated_at, url: p.url,
+      submitted_at: p.submitted_at, updated_at: p.updated_at,
+      ...(Object.hasOwn(p, "announced_on") ? { announced_on: p.announced_on } : {}),
+      url: p.url,
       verdict: p.verdict, study_type: p.study_type, summary_zh: p.summary_zh,
       reason_zh: p.reason_zh, evidence_abstract_quote: p.evidence_abstract_quote,
       fulltext_review_question: p.fulltext_review_question,
@@ -197,17 +199,36 @@ export function validateArxivReport(input: unknown): ArxivReport {
   calendar(r.issue_date, "issue_date");
   timestamp(r.generated_at_utc, "generated_at_utc");
   timestamp(r.input_collected_at_utc, "input_collected_at_utc");
+  // A record read out of the official RSS announcement feed states NO submission or update instant,
+  // and an unknown date stays unknown: null is accepted exactly when the item carries the real
+  // announcement day, so a reader always has one honest day to show. A synthesized timestamp would
+  // have been indistinguishable from a real one and is refused by this shape.
   r.items.forEach((p, i) => {
-    timestamp(p.submitted_at, `items[${i}].submitted_at`);
-    timestamp(p.updated_at, `items[${i}].updated_at`);
-  });
-  r.items.forEach((p, i) => {
-    const submitted = timestamp(p.submitted_at, `items[${i}].submitted_at`);
-    const updated = timestamp(p.updated_at, `items[${i}].updated_at`);
-    const precision = Math.max(submitted.fraction.length, updated.fraction.length);
-    if (updated.second < submitted.second || (updated.second === submitted.second
-        && updated.fraction.padEnd(precision, "0") < submitted.fraction.padEnd(precision, "0"))) {
-      fail(`items[${i}].updated_at`, "must not precede submitted_at");
+    const path = `items[${i}]`;
+    const hasSubmitted = p.submitted_at !== null && p.submitted_at !== undefined;
+    const hasUpdated = p.updated_at !== null && p.updated_at !== undefined;
+    if (hasSubmitted) timestamp(p.submitted_at, `${path}.submitted_at`);
+    if (hasUpdated) timestamp(p.updated_at, `${path}.updated_at`);
+    if (!hasSubmitted || !hasUpdated) {
+      // The absent instant is named in the failure as well as the announcement day it would have
+      // needed: `submitted_at` (or `updated_at`) really is the field the reader is looking at, and a
+      // message that only said "announced_on" would send an operator to the wrong field.
+      const absent = hasSubmitted ? `${path}.updated_at` : `${path}.submitted_at`;
+      if (p.announced_on === null || p.announced_on === undefined) {
+        fail(absent,
+          "may be null only when announced_on states the real announcement day: an unknown date stays unknown, and the announcement day is the only honest day");
+      }
+      calendar(p.announced_on, `${path}.announced_on`);
+    }
+    if (hasSubmitted && !hasUpdated) fail(`${path}.updated_at`, "required when submitted_at is present");
+    if (hasSubmitted && hasUpdated) {
+      const submitted = timestamp(p.submitted_at, `${path}.submitted_at`);
+      const updated = timestamp(p.updated_at, `${path}.updated_at`);
+      const precision = Math.max(submitted.fraction.length, updated.fraction.length);
+      if (updated.second < submitted.second || (updated.second === submitted.second
+          && updated.fraction.padEnd(precision, "0") < submitted.fraction.padEnd(precision, "0"))) {
+        fail(`${path}.updated_at`, "must not precede submitted_at");
+      }
     }
   });
   if (typeof r.input_sha256 !== "string" || r.input_sha256.length !== 64 || !/^[0-9a-f]{64}$/.test(r.input_sha256)) {

@@ -1,4 +1,4 @@
-import { Link, useLoaderData, useNavigate } from "react-router";
+import { Link, redirect, useLoaderData, useNavigate } from "react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ArxivFeed } from "@aihot/contracts/arxiv";
 import { loadOr404, edgeTtl } from "../lib/api.server";
@@ -8,6 +8,7 @@ import { MathText } from "../components/MathText";
 import type { Screen } from "../components/shell/screens";
 import { adoptSignal, coerceGroups, evaluateContent, useNewContentNotice, type ContentBaseline, type ContentSignal } from "../features/feed/new-content";
 import { NewContentBanner } from "../features/feed/NewContentBanner";
+import { ArxivPagination } from "../features/arxiv/ArxivPagination";
 
 export const handle: Screen = { home: "me", name: "arXiv 候选" };
 const NOTE = "AI 根据标题与摘要整理，请以论文原文为准。";
@@ -24,11 +25,24 @@ function categoryLabel(code: string): string {
   const label = CATEGORY_LABELS[code];
   return label ? `${label}（${code}）` : code;
 }
+/**
+ * The day this record is grouped and headed under. The announcement day is preferred whenever the
+ * source stated one; otherwise the API submission day. When NEITHER exists — a record read out of the
+ * official RSS announcement feed, which states no submission instant at all — the day is reported as
+ * unknown. It is never rendered as `new Date(null)`, which would print 1970-01-01 as if it were data.
+ */
 function sourceDay(paper: ArxivFeed["items"][number]): string {
-  return paper.announced_on ?? new Date(paper.submitted_at).toISOString().slice(0, 10);
+  if (paper.announced_on) return paper.announced_on;
+  if (paper.submitted_at) return new Date(paper.submitted_at).toISOString().slice(0, 10);
+  return "日期未知";
 }
 function dayGroup(paper: ArxivFeed["items"][number]): string {
-  return `${sourceDay(paper)}|${paper.announced_on ? "announced" : "submitted"}`;
+  const kind = paper.announced_on ? "announced" : paper.submitted_at ? "submitted" : "unknown";
+  return `${sourceDay(paper)}|${kind}`;
+}
+/** The same two instants, as a label/value pair, so a missing one reads as "unknown" not as 1970. */
+function instantLabel(value: string | null | undefined): string {
+  return value ? new Date(value).toISOString().slice(0, 10) : "未知";
 }
 const STUDIES = { observation: "观测", simulation: "模拟", theory: "理论", method: "方法", mixed: "混合研究" };
 
@@ -51,6 +65,19 @@ export async function loader({ request }: { request: Request }) {
   for (const [key, value] of input) if (["page", "pageSize", "category"].includes(key)) params.append(key, value);
   const path = `/api/arxiv/items${params.size ? `?${params}` : ""}`;
   const feed = await loadOr404<ArxivFeed>(path, { signal: request.signal });
+  // An out-of-range page is a real request the read layer answers with an EMPTY list while still echoing
+  // the page it was asked for (publication/arxiv.ts accepts any positive page and returns it back).
+  // Showing "page 11 of 10" over that empty list would be a label pretending to be data, and clamping
+  // only the pager's own numbers would hide the disagreement instead of fixing it. The correction is
+  // made in the DATA: the reader is sent to the page that really exists, so the URL, the paper list and
+  // the pager all name the same page — a bookmarked deep page whose data shrank lands on the new last
+  // page instead of an empty screen.
+  const pageCount = Math.max(1, Math.ceil((Number.isFinite(feed.total) ? feed.total : 0) / (feed.pageSize > 0 ? feed.pageSize : 1)));
+  if (feed.page > pageCount) {
+    const corrected = new URLSearchParams(params);
+    corrected.set("page", String(pageCount));
+    throw redirect(`/arxiv?${corrected}`);
+  }
   return { feed, category: input.get("category") };
 }
 
@@ -190,21 +217,17 @@ export function ArxivPageContent({ feed, category }: { feed: ArxivFeed; category
     </nav>
     {view.items.length === 0 && <p className="card p-6 text-ink-3">{!view.latestBatch ? "尚未同步报告，候选档案暂无数据。" : view.total > 0 || view.page > 1 ? "此页暂无候选，请返回上一页。" : category ? "该方向暂无候选，请尝试其他方向或全部方向。" : "候选档案暂无精选候选。"}</p>}
     <ul aria-labelledby="candidate-archive" className="space-y-4">{view.items.map((paper, index) => <li key={paper.paper_key}>
-      {(index === 0 || dayGroup(paper) !== dayGroup(view.items[index - 1]!)) && <h3 className="mb-3 text-base font-semibold text-ink">{sourceDay(paper)}<span className="ml-2 text-xs font-normal text-ink-4">{paper.announced_on ? "公告" : "提交（UTC）"}</span></h3>}
+      {(index === 0 || dayGroup(paper) !== dayGroup(view.items[index - 1]!)) && <h3 className="mb-3 text-base font-semibold text-ink">{sourceDay(paper)}<span className="ml-2 text-xs font-normal text-ink-4">{paper.announced_on ? "公告" : paper.submitted_at ? "提交（UTC）" : "来源未提供日期"}</span></h3>}
       <div className="card p-5">
       <h4 className="text-lg font-semibold text-ink"><MathText text={paper.title_zh} /></h4>
       <p lang="en" className="mt-1 text-sm text-ink-3"><MathText text={paper.title_original} /></p>
       <p className="mt-3 whitespace-pre-line leading-relaxed text-ink"><MathText text={paper.summary_zh} /></p>
       <p className="mt-3 text-sm text-ink-3">{STUDIES[paper.study_type]} · {paper.categories.map(categoryLabel).join(" / ")} · {paper.arxiv_id}</p>
-      <p className="mt-1 text-xs text-ink-4">提交（UTC）：<time dateTime={paper.submitted_at}>{new Date(paper.submitted_at).toISOString().slice(0, 10)}</time> · 更新（UTC）：<time dateTime={paper.updated_at}>{new Date(paper.updated_at).toISOString().slice(0, 10)}</time></p>
+      <p className="mt-1 text-xs text-ink-4">{paper.announced_on ? <>公告日：<time dateTime={paper.announced_on}>{paper.announced_on}</time> · </> : null}提交（UTC）：{paper.submitted_at ? <time dateTime={paper.submitted_at}>{instantLabel(paper.submitted_at)}</time> : <span>未知（来源为 arXiv 官方公告源，未提供提交时间）</span>} · 更新（UTC）：{paper.updated_at ? <time dateTime={paper.updated_at}>{instantLabel(paper.updated_at)}</time> : <span>未知</span>}</p>
       <a className="mt-3 inline-block text-sm font-medium text-accent" href={paper.url} target="_blank" rel="noopener noreferrer">阅读 arXiv 原文 ↗</a>
       </div>
     </li>)}</ul>
-    <nav aria-label="候选分页" className="mt-6 flex items-center justify-between gap-3 text-sm text-ink-3">
-      {view.page > 1 ? <Link to={href(view.page - 1)}>上一页</Link> : <span />}
-      <span>第 {view.page} 页 · 共 {view.total} 条</span>
-      {view.page * view.pageSize < view.total ? <Link to={href(view.page + 1)}>下一页</Link> : <span />}
-    </nav>
+    <ArxivPagination page={view.page} pageSize={view.pageSize} total={view.total} href={href} />
   </div>;
 }
 

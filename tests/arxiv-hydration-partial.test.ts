@@ -1,4 +1,11 @@
 import './setup.ts';
+
+// This file drives the OPTIONAL API supplement. The ordinary round is RSS-primary and touches the
+// export API zero times, so a test that is about the API path has to ask for it explicitly.
+process.env.ARXIV_API_SUPPLEMENT_ENABLED='true';
+// This file drives the LEGACY ordinary submission-date window. It is a separate, default-off switch
+// from the API supplement (RSS-U3): asking for the gap-fill must not bring the window back.
+process.env.ARXIV_API_WINDOW_ENABLED='true';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sql,closeDb} from '../packages/backend/src/db.ts';
@@ -8,6 +15,10 @@ import {parseArxivAtom} from '../packages/backend/src/arxiv/collect.ts';
 
 const DAYS:Record<number,string>={5:'Mon',6:'Tue',7:'Wed',8:'Thu'};
 const atomFor=(papers:{id:string;title?:string;summary?:string}[],start=0)=>`<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"><opensearch:totalResults>${papers.length}</opensearch:totalResults><opensearch:startIndex>${start}</opensearch:startIndex><opensearch:itemsPerPage>${papers.length}</opensearch:itemsPerPage>${papers.map(({id,title,summary})=>`<entry><id>https://arxiv.org/abs/${id}</id><title>${title??`Title ${id}`}</title><summary>${summary??`Abstract ${id}`}</summary><published>2026-10-01T00:00:00Z</published><updated>2026-10-01T00:00:00Z</updated><author><name>Alice</name></author><category term="astro-ph.CO"/></entry>`).join('')}</feed>`;
+// The feed items here deliberately carry NO title, abstract or creator, so every announcement of this
+// file is isolated and its version genuinely has no raw paper: the export API is then the only thing
+// that could supply it, which is what makes this file a test of the optional API supplement at all. A
+// feed item that DID carry its content would be stored by the RSS round itself and never asked about.
 const rssFor=(ids:string[],day=7)=>`<rss version="2.0" xmlns:arxiv="http://arxiv.org/schemas/atom"><channel><title>astro-ph</title>${ids.map(id=>`<item><guid>oai:arXiv.org:${id}</guid><link>https://arxiv.org/abs/${id.replace(/v\d+$/,'')}</link><pubDate>${DAYS[day]}, 0${day} Oct 2026 00:00:00 -0400</pubDate><category>astro-ph.CO</category><arxiv:announce_type>new</arxiv:announce_type></item>`).join('')}</channel></rss>`;
 const jobOptions=(fetchImpl:typeof fetch,now:string)=>({fetch:fetchImpl,sleep:async()=>{},now:()=>new Date(now)});
 const clean=()=>sql`TRUNCATE arxiv_raw_papers,arxiv_raw_batches,arxiv_announcements,arxiv_announcement_batches,arxiv_collection_state,arxiv_hydration_exceptions,arxiv_rss_cache CASCADE`;
@@ -112,7 +123,7 @@ test('an entry that was never requested is recorded and never stored as a paper'
  assert.deepEqual([...open[0]!.returned_ids].sort(),['2610.04201v1','2610.04202v1','2610.04999v1'],'the whole returned ID list is kept as evidence');
 });
 
-test('a same-base different-version answer rejects the whole batch and stores nothing',async()=>{
+test('a same-base different-version answer rejects the whole hydration batch and stores nothing',async()=>{
  await clean();
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const fake:typeof fetch=async input=>{
@@ -122,14 +133,36 @@ test('a same-base different-version answer rejects the whole batch and stores no
   if(!ids.length) return new Response(atomFor([]));
   return new Response(atomFor([{id:'2610.04500v2'}]));
  };
- const error=await collectAndStoreArxiv(jobOptions(fake,'2026-10-07T12:00:00Z')).then(()=>undefined,f=>f as Error);
- assert.ok(error,'a wrong version must reject the batch');
- assert.match(error.message,/version mismatch/);
- assert.match(error.message,/requested v1, received v2/,'the error names the version');
+ const result=await collectAndStoreArxiv(jobOptions(fake,'2026-10-07T12:00:00Z'));
+ // The wrong version is answered by the OPTIONAL supplement, and that failure is its own: it is
+ // recorded against the supplement, the round is NOT turned into a total failure, and nothing the RSS
+ // round already committed is rolled back. The supplement asked because the version really was
+ // missing — the feed announced it but its item carried no content to store.
+ assert.equal(result!.apiSupplementAttempted,true,'the version was really missing, so the supplement asked for it');
+ assert.equal(result!.partial,true,'the supplement gap is reported as a partial round');
+ // The rejection is its own classification, NOT the ordinary transport failure (RSS-U4 evidence
+ // seams): a JUDGED and refused batch must not read like a 503.
+ assert.match(String(result!.apiSupplementBatchRejected),/version mismatch/);
+ assert.match(String(result!.apiSupplementBatchRejected),/requested v1, received v2/,'the error names the version');
+ assert.equal(result!.apiSupplementFailed,undefined,'and it is not flattened into the ordinary supplement failure');
+ // The correctness red line itself is NOT relaxed: the rejected batch stored nothing at all.
  assert.equal((await sql`SELECT count(*)::int n FROM arxiv_raw_papers`)[0]!.n,0,'no paper may be stored');
- assert.equal((await sql`SELECT count(*)::int n FROM arxiv_raw_batches`)[0]!.n,0,'the untrustworthy document must not be archived');
+ // The untrustworthy document is never archived. The round does now go on to walk its ordinary
+ // submission-date window, and a walked window leaves its own (empty) page behind — so the assertion
+ // is about the CONTENT: no archived batch carries the rejected response or a single paper.
+ assert.equal((await sql`SELECT count(*)::int n FROM arxiv_raw_batches WHERE raw_atom LIKE '%2610.04500v2%'`)[0]!.n,0,'the untrustworthy document must not be archived');
+ assert.equal((await sql`SELECT coalesce(sum(paper_count),0)::int n FROM arxiv_raw_batches`)[0]!.n,0,'no archived batch may carry a paper');
  assert.equal((await sql`SELECT count(*)::int n FROM arxiv_hydration_exceptions`)[0]!.n,0);
- assert.equal((await sql`SELECT completed_through FROM arxiv_collection_state`)[0]!.completed_through,null,'the watermark must not advance');
+ // ...and the rejection keeps its own offline evidence, naming the version that really conflicted.
+ const rejections=await sql<{kind:string;arxiv_ids:string[];detail:string;raw_response_excerpt:string}[]>`
+  SELECT kind,arxiv_ids,detail,raw_response_excerpt FROM arxiv_hydration_rejections`;
+ assert.equal(rejections.length,1,'the rejection keeps its own offline evidence');
+ assert.equal(rejections[0]!.kind,'version_mismatch');
+ assert.deepEqual(rejections[0]!.arxiv_ids,['2610.04500v1']);
+ assert.match(rejections[0]!.detail,/requested v1, received v2/);
+ assert.match(rejections[0]!.raw_response_excerpt,/2610\.04500v2/,'the untrustworthy response is kept');
+ // The announcement stays unproven: no raw paper, no exception, so a later round asks again.
+ assert.equal((await sql`SELECT count(*)::int n FROM arxiv_hydration_exceptions WHERE resolved_at IS NULL`)[0]!.n,0);
 });
 
 test('a same-version metadata drift rejects the batch and rolls the exception registration back with it',async()=>{
@@ -236,7 +269,9 @@ test('a zero-hit sub-batch is recorded, does not stop the next sub-batch or the 
   window.push(u.href);
   return new Response(atomFor([]));
  };
- const result=await collectAndStoreArxiv({...jobOptions(fake,'2026-10-07T12:00:00Z'),pageSize:1});
+ // pageSize 1 keeps the legacy window page one paper wide; the supplement's own batch size (RSS-U3)
+ // is what splits the gap list, so the zero-hit sub-batch below is a real single-id request.
+ const result=await collectAndStoreArxiv({...jobOptions(fake,'2026-10-07T12:00:00Z'),pageSize:1,supplementBatchIds:1});
  assert.equal(result!.partial,true,'a sub-batch that stored nothing is reported as a partial round, not a failed one');
  assert.equal(result!.complete,false,'a partial round never claims the window was handled');
  assert.equal(result!.hydrationIngested,1,'the healthy version is still counted');

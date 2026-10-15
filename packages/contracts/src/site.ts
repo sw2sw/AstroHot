@@ -207,7 +207,7 @@ export interface SiteItemDetail extends ItemSummary {
   /** The post with all its media; its text is the body. */
   x: Omit<XPostView, "text" | "translation"> | null;
   /** The approved news card image at body size, with its caption and credit; an image licence independent of full text. */
-  newsImage?: MediaView | null;
+  newsImage?: NewsThumbnail | null;
   /** Selected, but its fact's seat is held by this report: marked 同新闻, without a reason of its own. */
   sameEvent?: { id: string; title: string } | null;
   readingMode: "full" | "summary-only";
