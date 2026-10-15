@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryRouter, RouterProvider } from "react-router";
 let vite: ViteDevServer;
 // fileURLToPath, not `.pathname`: on Windows the latter is `/D:/…`, which Vite resolves to `D:\D:\…`.
-before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" }); });
+before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" }); });
 after(async () => { await vite?.close(); });
 
 test("the topic document is served at its resource route with the bundled banner", async () => {

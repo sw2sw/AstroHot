@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 const events = JSON.parse(readFileSync(new URL("../app/features/calendar/events.json", import.meta.url), "utf8"));
 
 let vite: ViteDevServer;
-before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" }); });
+before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" }); });
 after(async () => { await vite?.close(); });
 
 async function card(today: string) {

@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer, type ViteDevServer } from "vite";
 import { readFile } from "node:fs/promises";
 let vite: ViteDevServer;
-before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" }); });
+before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" }); });
 after(async () => { await vite?.close(); });
 const image = { kind: "image", url: "/api/img-proxy?u=first&mode=body", srcSet: "/api/first-720 720w, /api/first-1440 1440w", width: 2000, height: 1000, alt: "恒星形成", poster: null, caption: "艺术家概念图", credit: "NASA, ESA, L. Hustak (STScI)", attributionUrl: "https://esahubble.org/images/heic2613a/" };
 test("article lead image is responsive, uncropped and retains complete attribution", async () => {

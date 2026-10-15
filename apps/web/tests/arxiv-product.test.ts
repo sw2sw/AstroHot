@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { createServer, type ViteDevServer } from "vite";
 let vite: ViteDevServer;
-before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" }); });
+before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" }); });
 after(async () => { await vite?.close(); });
 const feed = { page: 1, pageSize: 20, total: 1, mode: "pilot", issueDate: "2026-10-05", lastSyncedAt: "2026-10-05T08:37:30Z", coverage: "Internal coverage Asia/Shanghai", note: "internal long disclaimer", latestBatch: { outcome: "selected" }, items: [{ paper_key: "test", title_zh: "论文中文标题", title_original: "Paper original title", summary_zh: "研究摘要与科学结果", reason_zh: "未涉及临床观察，因此给出SELECT", study_type: "observation", categories: ["astro-ph.GA"], arxiv_id: "2610.03572v1", submitted_at: "2026-10-02T00:00:00Z", updated_at: "2026-10-02T00:00:00Z", url: "https://arxiv.org/abs/2610.03572" }] };
 test("arxiv reader page retains scientific content without screening internals", async () => {

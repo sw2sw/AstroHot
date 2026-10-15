@@ -14,7 +14,7 @@ let Page: () => ReturnType<typeof createElement>;
 before(async () => {
  // fileURLToPath, not `new URL(...).pathname`: on Windows the latter yields `/D:/…`, which Vite
  // resolves to `D:\D:\…` and then cannot create — the whole file failed before rendering anything.
- vite = await createServer({ configFile: false, root: fileURLToPath(new URL("../apps/web", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" });
+ vite = await createServer({ configFile: false, root: fileURLToPath(new URL("../apps/web", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" });
  Page = (await vite.ssrLoadModule("/app/routes/arxiv.tsx")).default;
 });
 after(async () => { await vite?.close(); });

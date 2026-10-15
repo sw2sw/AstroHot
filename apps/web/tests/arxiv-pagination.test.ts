@@ -12,7 +12,7 @@ import { MemoryRouter } from "react-router";
 import { createServer, type ViteDevServer } from "vite";
 
 let vite: ViteDevServer;
-before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" }); });
+before(async () => { vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" }); });
 after(async () => { await vite?.close(); });
 
 const paper = {

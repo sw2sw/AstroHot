@@ -20,7 +20,7 @@ let vite: ViteDevServer;
 before(async () => {
   // fileURLToPath, not `new URL("..", import.meta.url).pathname`: on Windows the latter is `/D:/…`,
   // which Vite cannot resolve (the older tests in this folder hit exactly that).
-  vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: "custom" });
+  vite = await createServer({ configFile: false, root: fileURLToPath(new URL("..", import.meta.url)), server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" });
 });
 after(async () => { await vite?.close(); });
 
