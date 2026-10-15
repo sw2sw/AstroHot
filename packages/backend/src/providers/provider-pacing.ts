@@ -30,6 +30,25 @@ function maxConcurrent(env: string, fallback: number): number {
   return n;
 }
 
+/** True when a hostname reaches this machine over loopback (a local test double, or a locally run server). */
+function isSameHost(hostname: string): boolean {
+  const host = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1' || host === '0:0:0:0:0:0:0:1') return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  return !!v4 && Number(v4[1]) === 127;
+}
+
+/** The spacing a loopback origin gets. Unset means the same conservative default as any other origin. */
+function loopbackIntervalMs(): number {
+  const value = process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS;
+  if (value === undefined || value === '') return 10_000;
+  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) throw new ProviderRejectedError('MODEL_LOOPBACK_ORIGIN_INTERVAL_MS must be a non-negative integer', null, false);
+  const n = Number(value);
+  if (!Number.isSafeInteger(n)) throw new ProviderRejectedError('MODEL_LOOPBACK_ORIGIN_INTERVAL_MS must be a non-negative integer', null, false);
+  return n;
+}
+
 /** Every model origin gets a pacing policy: known providers by name, everything else by origin. */
 export function providerPacing(url: URL): ProviderPacing {
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
@@ -58,7 +77,19 @@ export function providerPacing(url: URL): ProviderPacing {
     intervalMs: Math.ceil(60_000 / positiveInteger('SILICONFLOW_REQUESTS_PER_MINUTE', 6)),
     maxConcurrent: maxConcurrent('SILICONFLOW_MAX_CONCURRENT', 1),
   };
-  // Unconfigured origins share one conservative local policy, keyed by origin alone (no model,
+  // An origin on this machine is reached over loopback: a local test double, or a model server (or a
+  // gateway) the operator runs beside the application. Reaching the host locally says nothing about a
+  // rate limit behind it — a local proxy can still forward to a metered upstream — so this origin keeps
+  // the same conservative spacing as any other unconfigured origin. A test environment that serves its
+  // own fake provider on this machine lowers it explicitly through MODEL_LOOPBACK_ORIGIN_INTERVAL_MS
+  // (tests/setup.ts sets 0); left unset, production behaviour is unchanged. The origin concurrency and
+  // the global soft cap apply either way.
+  if (isSameHost(url.hostname)) return {
+    name: `origin:${createHash('sha256').update(url.origin).digest('hex')}`,
+    intervalMs: loopbackIntervalMs(),
+    maxConcurrent: maxConcurrent('MODEL_ORIGIN_MAX_CONCURRENT', 2),
+  };
+  // Unconfigured remote origins share one conservative local policy, keyed by origin alone (no model,
   // key or path), so all model paths on the same origin stay inside one spacing window.
   return {
     name: `origin:${createHash('sha256').update(url.origin).digest('hex')}`,

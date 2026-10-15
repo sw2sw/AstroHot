@@ -25,6 +25,25 @@ test('provider matching is exact and rejects overlapping configured origins', ()
   finally { delete process.env.AGNES_BASE_URL; delete process.env.SILICONFLOW_BASE_URL; }
 });
 
+test('a loopback origin keeps the conservative default spacing unless the environment lowers it', () => {
+  const saved = process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS;
+  try {
+    delete process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS;
+    for (const host of ['http://127.0.0.1:8123/v1', 'http://localhost:8123/v1', 'http://[::1]:8123/v1']) {
+      const policy = providerPacing(new URL(host));
+      assert.match(policy.name, /^origin:/);
+      assert.equal(policy.intervalMs, 10_000, `${host} must not be sped up without an explicit setting`);
+    }
+    process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS = '0';
+    assert.equal(providerPacing(new URL('http://127.0.0.1:8123/v1')).intervalMs, 0);
+    process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS = 'not-a-number';
+    assert.throws(() => providerPacing(new URL('http://127.0.0.1:8123/v1')), /MODEL_LOOPBACK_ORIGIN_INTERVAL_MS/);
+  } finally {
+    if (saved === undefined) delete process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS;
+    else process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS = saved;
+  }
+});
+
 test('provider cooldown is isolated while quarantine still holds provider concurrency', async () => {
   await reset();
   const agnes = { name: 'agnes' as const, intervalMs: 1, maxConcurrent: 1 };

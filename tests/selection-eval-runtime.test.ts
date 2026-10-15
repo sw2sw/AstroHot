@@ -110,10 +110,12 @@ test("default evaluation follows the production score route and shares duplicate
       choices: [{ message: { content: JSON.stringify({ label: "PASS", reason: "relevant" }) } }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     }));
+    // A shared score must fall strictly between the T1 and T2 thresholds (60 and 70): on a
+    // threshold the fixture could no longer show that the tier, not the score, decides.
     const score = await stub(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       return {
-        choices: [{ message: { content: JSON.stringify({ attentionScore: 70 }) } }],
+        choices: [{ message: { content: JSON.stringify({ attentionScore: 64 }) } }],
         usage: { prompt_tokens: 100, completion_tokens: 20 },
       };
     });
@@ -140,7 +142,7 @@ test("a shared unusable score fails every matching case once, then retry usage i
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     }));
     const score = await stub((hit) => ({
-      choices: [{ message: { content: hit === 1 ? "not JSON" : JSON.stringify({ attentionScore: 70 }) } }],
+      choices: [{ message: { content: hit === 1 ? "not JSON" : JSON.stringify({ attentionScore: 64 }) } }],
       usage: { prompt_tokens: hit === 1 ? 100 : 300, completion_tokens: 20 },
     }));
     t.after(async () => { await Promise.all([prefilter.close(), score.close()]); });

@@ -48,7 +48,24 @@ for (const type of ['new', 'cross', 'replace', 'replace-cross']) {
   });
 }
 
-for (const type of ['new', 'cross']) {
+// A repeated cross notice may also move to a later RSS day: the publisher re-lists an identity when it
+// recrosses a category, and the standings for that day still name the paper. Treating that as a
+// contradiction would roll back the whole incoming feed, including that day's new papers. As with the
+// two revision notices, the first observation and its batch are kept.
+test('cross repeated on another source day preserves the first observation and batch', async () => {
+  await ingestArxivAnnouncements(rss(item('cross')), '2026-10-07T02:47:25Z');
+  const before = await snapshot();
+  const result = await ingestArxivAnnouncements(rss(item('cross', nextDay)), '2026-10-08T02:35:03Z');
+  assert.equal(result.status, 'imported');
+  const after = await snapshot();
+  assert.deepEqual(after.announcements, before.announcements);
+  assert.equal(after.batches.length, 2);
+  assert.deepEqual(after.batches.find(b => b.content_hash === before.batches[0]!.content_hash), before.batches[0]);
+});
+
+// A new notice has no such latitude: the publisher announces a paper once, so a different source day
+// for the same identity is a real contradiction and nothing from the incoming batch may be written.
+for (const type of ['new']) {
   test(`${type} contradictory source day rejects and rolls back the entire incoming batch`, async () => {
     await ingestArxivAnnouncements(rss(item(type)), '2026-10-07T02:47:25Z');
     const before = await snapshot();
@@ -58,8 +75,10 @@ for (const type of ['new', 'cross']) {
   });
 }
 
+// Identity and version are red lines for every repeatable type, cross included: the tolerated latitude
+// is the source day alone, never a disagreement about which paper or which version a notice names.
 for (const field of ['base_id', 'version'] as const) {
-  for (const type of ['replace', 'replace-cross']) {
+  for (const type of ['replace', 'replace-cross', 'cross']) {
     test(`${type} mismatched stored ${field} still rejects and rolls back the entire batch`, async () => {
       await ingestArxivAnnouncements(rss(item(type)), '2026-10-07T02:47:25Z');
       if (field === 'base_id') await sql`UPDATE arxiv_announcements SET base_id='2512.19653'`;

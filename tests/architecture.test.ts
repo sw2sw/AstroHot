@@ -103,10 +103,24 @@ const PRODUCTION = ["packages/backend/src", "packages/contracts/src", "apps/api/
 const production = () => [...PRODUCTION.flatMap((dir) => sources(dir)), { file: "apps/web/server.ts", text: readFileSync(path.join(ROOT, "apps/web/server.ts"), "utf8") }];
 const words = (text: string) => new Set(text.match(/[A-Za-z_][A-Za-z0-9_]*/g));
 
+// Stored state that no current reader names, kept for a reason that is not this code. A retired column
+// is still read by an image old enough to be rolled back onto this database, so it cannot be dropped
+// without breaking that rollback. Listed one by one, with the reason, and each entry must still name a
+// real column: a pattern here would exempt columns nobody has decided about, and an entry whose column
+// is gone would outlive its reason.
+const RETAINED_COLUMNS = new Map([
+  // 0068 replaces the fixed slot list with the durable due schedule and keeps the day table's old
+  // columns as they are: "an older image rolling back still reads them, and no history is rewritten".
+  ["arxiv_collection_day.last_slot_at", "0068: read by an older image rolled back onto this database"],
+]);
+
 test("every table and column is used by the code that reads and writes the database", async () => {
   const files = ["packages/backend/src", "apps/api/src", "apps/worker/src"].flatMap((dir) => sources(dir)).map(({ text }) => words(text));
   const columns = await sql<{ table_name: string; column_name: string }[]>`
     SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name <> 'schema_migrations'`;
+  const present = new Set(columns.map(({ table_name: table, column_name: column }) => `${table}.${column}`));
+  assert.deepEqual([...RETAINED_COLUMNS.keys()].filter((name) => !present.has(name)), [],
+    "a retained column is gone from the database: drop it from retained columns with the migration that removed it");
   const unused = new Set<string>();
   for (const { table_name: table, column_name: column } of columns) {
     const users = files.filter((names) => names.has(table));
@@ -114,7 +128,7 @@ test("every table and column is used by the code that reads and writes the datab
     // created_at is the row's own timestamp, kept on every table for operations.
     else if (column !== "created_at" && !users.some((names) => names.has(column))) unused.add(`${table}.${column}`);
   }
-  assert.deepEqual([...unused], [], "drop it with a migration in the same change");
+  assert.deepEqual([...unused].filter((name) => !RETAINED_COLUMNS.has(name)), [], "drop it with a migration in the same change");
 });
 
 // import.meta.env.DEV and the like are the web build's own flags, not environment variables.
@@ -146,9 +160,17 @@ test("every environment variable the code reads is listed in a template, and eve
   assert.deepEqual([...listed].filter((name) => !readAnywhere.has(name)), [], "no code reads it: remove it from the template");
 });
 
+// One field the response carries for readers outside this website: the contract documents `admittedAt`
+// as a COARSE write witness that must never decide new content, and the web tests assert the site does
+// not read it, so the website correctly never names it. It stays in the response for API consumers.
+// Named as the exact `file: field` pair, not as a field name and not as a pattern: every other field of
+// these interfaces still has to be read by the website or leave the contract.
+const CONTRACT_FIELDS_FOR_CONSUMERS = new Set(["packages/contracts/src/site.ts: admittedAt"]);
+
 test("every field of the website's own interfaces is read by the website", () => {
   const web = words(production().filter(({ file }) => file.startsWith("apps/web/")).map(({ text }) => text).join("\n"));
   const unread = ["packages/contracts/src/site.ts", "packages/contracts/src/leaderboard.ts"].flatMap((file) =>
     assigned(file, /^\s+(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??:\s/gm).filter((field) => !web.has(field)).map((field) => `${file}: ${field}`));
-  assert.deepEqual(unread, [], "drop the field from the contract and from the read that fills it, or show it");
+  assert.deepEqual(unread.filter((name) => !CONTRACT_FIELDS_FOR_CONSUMERS.has(name)), [],
+    "drop the field from the contract and from the read that fills it, or show it");
 });

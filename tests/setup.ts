@@ -13,6 +13,13 @@ if (!/_(test|ci)$/.test(database)) {
 process.env.AIHOT_CREDENTIALS_DIR = "/nonexistent-test-credentials";
 process.env.SESSION_SECRET ??= "test-session-secret-0123456789";
 process.env.IMG_PROXY_SIGN_SECRET ??= "test-img-secret-0123456789";
+// The imagery routes are gated by IMAGERY_ENABLED (production default off); the imagery tests
+// drive the real application, so the tests turn that one valve on here.
+process.env.IMAGERY_ENABLED ??= "true";
+// Every model double in these tests listens on loopback. Production keeps the conservative spacing
+// there (a local gateway can still front a metered upstream), so the test environment — which owns
+// the provider behind the port — is the only place that lowers it.
+process.env.MODEL_LOOPBACK_ORIGIN_INTERVAL_MS ??= "0";
 process.env.FEISHU_CONTENT_PUSH_ENABLED = "false";
 process.env.INDEXNOW_SUBMIT_ENABLED = "false";
 process.env.LOG_LEVEL ??= "error";
