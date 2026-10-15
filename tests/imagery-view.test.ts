@@ -9,7 +9,8 @@ const loader = `
 import { readFile } from "node:fs/promises";
 import { transformWithOxc } from ${JSON.stringify(import.meta.resolve("vite"))};
 export async function load(url, context, nextLoad) {
-  if (url.includes("/apps/web/app/features/imagery/") && /\\.tsx?$/.test(url)) {
+  // Include shared TSX dependencies (for example MathText), not only imagery files.
+  if (url.includes("/apps/web/app/") && /\\.tsx?$/.test(url)) {
     const result = await transformWithOxc(await readFile(new URL(url), "utf8"), new URL(url).pathname, { jsx: { runtime: "automatic" } });
     return { format: "module", shortCircuit: true, source: result.code };
   }

@@ -55,7 +55,8 @@ export async function esaScienceImageAttribution(articleUrl: string, candidateUr
     if (!metadata) return null;
     for (const node of document.querySelectorAll("footer, header, nav, script, style, .footer, #footer")) node.remove();
     const details = document.querySelector("#modal__tab-content--details, main, [role='main']") ?? metadata.parentElement;
-    if (/\b(?:all\s+rights\s+reserved|permission\s+(?:is\s+)?required|not\s+(?:covered|licensed)|third[-\s]+party)\b/i.test(details?.innerText ?? "")) return null;
+    const detailsText = details && "innerText" in details && typeof details.innerText === "string" ? details.innerText : "";
+    if (/\b(?:all\s+rights\s+reserved|permission\s+(?:is\s+)?required|not\s+(?:covered|licensed)|third[-\s]+party)\b/i.test(detailsText)) return null;
     const fields = [...metadata.querySelectorAll("li")];
     const creditNode = fields.find((node) => node.querySelector("b")?.textContent?.trim() === "CREDIT");
     const licenseNode = fields.find((node) => node.querySelector("b")?.textContent?.trim() === "LICENCE");

@@ -14,18 +14,18 @@ const outputSchema = z.object({
 });
 
 /** 与 chatJson 兼容的调用签名，测试里注入假实现。 */
-type ChatJsonLike = <S extends z.ZodType>(opts: {
+type ChatJsonLike = (opts: {
   model: string;
   purpose: string;
   subject: string;
   promptVersion: string;
   system: string;
   user: string;
-  schema: S;
+  schema: typeof outputSchema;
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
-}) => Promise<{ data: z.infer<S>; receiptId: number }>;
+}) => Promise<{ data: z.infer<typeof outputSchema>; receiptId: number }>;
 
 export async function translateImagery(
   metadata: { source: string; sourceDate: string; titleEn: string; explanationEn: string },
