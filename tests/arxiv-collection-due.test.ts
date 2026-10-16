@@ -184,49 +184,49 @@ const holdRow = async (table: 'arxiv_collection_state' | 'arxiv_collection_sched
   return { release, blocker };
 };
 
-test('the day is anchored at 01:00 UTC: midnight never starts it early and the anchor itself does', async () => {
+test('the day is anchored at 05:30 UTC: midnight never starts it early and the anchor itself does', async () => {
   await clean();
-  // 00:59:59.999 is one millisecond before the anchor: nothing may run, not even the initialization.
-  const early = await begin(new Date('2026-10-07T00:59:59.999Z'));
+  // 05:29:59.999 is one millisecond before the anchor: nothing may run, not even the initialization.
+  const early = await begin(new Date('2026-10-07T05:29:59.999Z'));
   assert.equal(early.allowed, false);
   assert.equal(early.reason, 'not_due');
-  assert.equal(early.nextDueAt, '2026-10-07T01:00:00.000Z', 'the day opens exactly at its UTC anchor');
+  assert.equal(early.nextDueAt, '2026-10-07T05:30:00.000Z', 'the day opens exactly at its UTC anchor');
   assert.equal((await day('2026-10-07')).attempts, 0, 'a tick before the anchor spends no attempt');
   // Exactly at the anchor it is admitted, with no tolerance in either direction.
-  const open = await begin(new Date('2026-10-07T01:00:00.000Z'));
+  const open = await begin(new Date('2026-10-07T05:30:00.000Z'));
   assert.equal(open.allowed, true);
   assert.equal(open.attempt, 1);
   assert.equal(open.retry, false);
 });
 
-test('the first attempt admitted at 01:00:22 owns 07:00:22 as its retry, so the 07:00 slot is never dropped', async () => {
+test('the first attempt admitted at 05:30:22 owns 11:30:22 as its retry, so the 11:30 slot is never dropped', async () => {
   await clean();
   enable();
   const hits: string[] = [];
   const empty = serving(() => rssFor([]), hits);
-  // The real defect: the cron's 07:00 tick lands 22 seconds BEFORE the six hours are up, the whole
-  // slot used to be discarded, and the day then waited until 13:00. Now the due instant is the real
+  // The real defect: the cron's 11:30 tick lands 22 seconds BEFORE the six hours are up, the whole
+  // slot used to be discarded, and the day then waited until 17:30. Now the due instant is the real
   // admission plus the interval, and the per-minute tick fires as soon as it really arrives.
-  const first = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T01:00:22.909Z') }));
+  const first = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T05:30:22.909Z') }));
   assert.equal(first.newContentCount, 0);
   assert.equal(first.attempt, 1);
-  assert.equal(await dueAt(), '2026-10-07T07:00:22.909Z');
+  assert.equal(await dueAt(), '2026-10-07T11:30:22.909Z');
   const issued = hits.length;
-  // The nominal 07:00 slot is early: refused, and it costs neither a request nor an attempt.
-  const nominal = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T07:00:00.000Z') }));
+  // The nominal 11:30 slot is early: refused, and it costs neither a request nor an attempt.
+  const nominal = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T11:30:00.000Z') }));
   assert.equal(nominal.reason, 'not_due');
-  assert.equal(nominal.nextEligibleAt, '2026-10-07T07:00:22.909Z');
+  assert.equal(nominal.nextEligibleAt, '2026-10-07T11:30:22.909Z');
   assert.equal(hits.length, issued, 'a tick before the due instant touches no network');
   assert.equal((await day('2026-10-07')).attempts, 1);
   // One millisecond before the due instant: still refused.
-  assert.equal(skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T07:00:22.908Z') })).reason, 'not_due');
+  assert.equal(skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T11:30:22.908Z') })).reason, 'not_due');
   assert.equal(hits.length, issued);
   // Exactly at the due instant the retry runs.
-  const retry = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T07:00:22.909Z') }));
+  const retry = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T11:30:22.909Z') }));
   assert.equal(retry.attempt, 2);
   assert.equal(retry.retry, true);
   assert.ok(hits.length > issued, 'the due retry really asked the source');
-  assert.equal(await dueAt(), '2026-10-07T13:00:22.909Z', 'the second retry is six real hours after the first');
+  assert.equal(await dueAt(), '2026-10-07T17:30:22.909Z', 'the second retry is six real hours after the first');
 });
 
 test('a delayed morning run opens its own six hours later instead of waiting for a fixed evening slot', async () => {
@@ -252,7 +252,7 @@ test('a delayed morning run opens its own six hours later instead of waiting for
   assert.equal(evening.attempt, ARXIV_COLLECT_ATTEMPTS_PER_DAY);
   // The exhausted day moves to the next UTC anchor, but the strict interval is never shortened to
   // reach it: the next allowed instant is the later of the two.
-  assert.equal(await dueAt(), '2026-10-08T03:00:22.000Z');
+  assert.equal(await dueAt(), '2026-10-08T05:30:00.000Z');
   assert.equal((await day('2026-10-07')).attempts, ARXIV_COLLECT_ATTEMPTS_PER_DAY);
 });
 
@@ -261,7 +261,7 @@ test('the UTC day admits at most three real attempts and a refused tick spends n
   enable();
   const hits: string[] = [];
   const empty = serving(() => rssFor([]), hits);
-  for (const stamp of ['2026-10-07T01:00:00Z', '2026-10-07T07:00:00Z', '2026-10-07T13:00:00Z']) {
+  for (const stamp of ['2026-10-07T05:30:00Z', '2026-10-07T11:30:00Z', '2026-10-07T17:30:00Z']) {
     const run = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at(stamp) }));
     assert.equal(run.newContentCount, 0);
     assert.equal(run.day, '2026-10-07');
@@ -269,13 +269,13 @@ test('the UTC day admits at most three real attempts and a refused tick spends n
   assert.equal((await day('2026-10-07')).attempts, ARXIV_COLLECT_ATTEMPTS_PER_DAY);
   assert.equal((await day('2026-10-07')).completed_at, null, 'an unproductive day stays open until its budget is gone');
   const issued = hits.length;
-  const spent = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T19:00:00Z') }));
+  const spent = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T23:30:00Z') }));
   assert.equal(spent.reason, 'budget');
   assert.equal(spent.attempts, ARXIV_COLLECT_ATTEMPTS_PER_DAY);
-  assert.equal(spent.nextEligibleAt, '2026-10-08T01:00:00.000Z', 'a spent day waits for the next UTC anchor');
+  assert.equal(spent.nextEligibleAt, '2026-10-08T05:30:00.000Z', 'a spent day waits for the next UTC anchor');
   assert.equal(hits.length, issued, 'a spent budget issues no request');
   // The budget is a UTC-day budget: the next UTC day opens a fresh one.
-  const nextDay = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-08T01:00:00Z') }));
+  const nextDay = ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-08T05:30:00Z') }));
   assert.equal(nextDay.attempt, 1);
   assert.equal((await day('2026-10-08')).attempts, 1);
 });
@@ -290,9 +290,9 @@ test('a very late attempt never steals the next UTC day first attempt and never 
   assert.equal(late.day, '2026-10-07');
   assert.equal(await dueAt(), '2026-10-08T05:30:00.000Z', 'six real hours after the late attempt');
   const issued = hits.length;
-  // The next day's anchor at 01:00 is EARLIER than the six hours the late attempt owns, so it is
+  // The next day's 05:29 tick is EARLIER than the six hours the late attempt owns, so it is
   // refused — the strict interval is not shortened for a new day.
-  const anchor = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-08T01:00:00Z') }));
+  const anchor = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-08T05:29:00Z') }));
   assert.equal(anchor.reason, 'not_due');
   assert.equal(anchor.nextEligibleAt, '2026-10-08T05:30:00.000Z');
   assert.equal(hits.length, issued);
@@ -309,19 +309,19 @@ test('an upgrade derives the due instant from the day row: a collected day is no
   assert.equal(await schedule(), undefined);
   // A day that already collected something new: its batch must not be run again.
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at,last_outcome,completed_at)
-    VALUES('2026-10-07'::date,1,'2026-10-07T01:00:10Z'::timestamptz,'collected','2026-10-07T01:00:20Z'::timestamptz)`;
-  assert.equal(await isDue(new Date('2026-10-07T05:00:00Z')), false, 'a closed day is not due');
-  const closed = await begin(new Date('2026-10-07T05:00:00Z'));
+    VALUES('2026-10-07'::date,1,'2026-10-07T05:30:10Z'::timestamptz,'collected','2026-10-07T05:30:20Z'::timestamptz)`;
+  assert.equal(await isDue(new Date('2026-10-07T09:30:00Z')), false, 'a closed day is not due');
+  const closed = await begin(new Date('2026-10-07T09:30:00Z'));
   assert.equal(closed.allowed, false);
   assert.equal(closed.reason, 'completed');
-  assert.equal(closed.nextDueAt, '2026-10-08T01:00:00.000Z', 'a closed day waits for the next UTC anchor');
+  assert.equal(closed.nextDueAt, '2026-10-08T05:30:00.000Z', 'a closed day waits for the next UTC anchor');
   // A day whose morning attempt found nothing: the retry it still owes must survive the upgrade.
   await clean();
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at,last_outcome)
-    VALUES('2026-10-08'::date,1,'2026-10-08T01:00:22.909Z'::timestamptz,'empty')`;
-  assert.equal(await isDue(new Date('2026-10-08T07:00:00Z')), false, 'the owed retry is not due yet');
-  assert.equal(await isDue(new Date('2026-10-08T07:00:22.909Z')), true, 'and it is due exactly six hours after the real admission');
-  const owed = await begin(new Date('2026-10-08T07:00:22.909Z'));
+    VALUES('2026-10-08'::date,1,'2026-10-08T05:30:22.909Z'::timestamptz,'empty')`;
+  assert.equal(await isDue(new Date('2026-10-08T11:30:00Z')), false, 'the owed retry is not due yet');
+  assert.equal(await isDue(new Date('2026-10-08T11:30:22.909Z')), true, 'and it is due exactly six hours after the real admission');
+  const owed = await begin(new Date('2026-10-08T11:30:22.909Z'));
   assert.equal(owed.allowed, true);
   assert.equal(owed.attempt, 2, 'the upgrade keeps the day budget instead of resetting it');
   assert.equal((await day('2026-10-08')).attempts, 2);
@@ -332,16 +332,16 @@ test('a tick that is not due only reads: no source request, no schedule write an
   enable();
   const hits: string[] = [];
   const empty = serving(() => rssFor([]), hits);
-  ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  ran(await collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   const before = await schedule();
   const issued = hits.length;
   // Ten idle minutes: each one is a read that decides nothing.
-  for (const minute of ['01:01', '01:02', '01:03', '01:04', '01:05', '01:06', '01:07', '01:08', '01:09', '01:10']) {
+  for (const minute of ['05:31', '05:32', '05:33', '05:34', '05:35', '05:36', '05:37', '05:38', '05:39', '05:40']) {
     assert.equal(await isDue(new Date(`2026-10-07T${minute}:00Z`)), false);
   }
   const after = await schedule();
   assert.equal(new Date(after!.updated_at).getTime(), new Date(before!.updated_at).getTime(), 'an idle tick does not touch the schedule');
-  assert.equal(await dueAt(), '2026-10-07T07:00:00.000Z');
+  assert.equal(await dueAt(), '2026-10-07T11:30:00.000Z');
   assert.equal(hits.length, issued, 'an idle tick never reaches the source');
   assert.equal((await day('2026-10-07')).attempts, 1);
 });
@@ -350,12 +350,12 @@ test('an attempt admitted and then crashed keeps its consumed attempt and its ne
   await clean();
   // The admission is what a run does before it touches the network. A process that dies right after it
   // must not let a restart re-request the source: the attempt and the floor both survive.
-  const admission = await begin(new Date('2026-10-07T01:00:00Z'));
+  const admission = await begin(new Date('2026-10-07T05:30:00Z'));
   assert.equal(admission.allowed, true);
-  assert.equal(admission.nextDueAt, '2026-10-07T07:00:00.000Z');
+  assert.equal(admission.nextDueAt, '2026-10-07T11:30:00.000Z');
   assert.equal((await day('2026-10-07')).attempts, 1, 'the attempt is consumed before the run starts');
-  assert.equal(await dueAt(), '2026-10-07T07:00:00.000Z');
-  const restarted = await begin(new Date('2026-10-07T01:00:05Z'));
+  assert.equal(await dueAt(), '2026-10-07T11:30:00.000Z');
+  const restarted = await begin(new Date('2026-10-07T05:30:05Z'));
   assert.equal(restarted.allowed, false, 'a restart five seconds later cannot re-request the source');
   assert.equal(restarted.reason, 'not_due');
   assert.equal((await day('2026-10-07')).attempts, 1, 'and it does not spend a second attempt');
@@ -367,8 +367,8 @@ test('two concurrent deliveries of one due instant cannot both start a collectio
   const hits: string[] = [];
   const empty = serving(() => rssFor([]), hits);
   const results = await Promise.all([
-    collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }),
-    collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }),
+    collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }),
+    collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }),
   ]);
   const running = results.filter((value): value is CollectRun => value !== undefined && !isScheduledSkip(value));
   const refused = results.filter(value => value !== undefined && isScheduledSkip(value));
@@ -381,8 +381,8 @@ test('a durable hold freezes the channel without spending an attempt and is hono
   await clean();
   enable();
   await sql`INSERT INTO arxiv_collection_state(key,owner,lease_until)
-    VALUES('astro-ph',NULL,clock_timestamp()+interval '2 hours')`;
-  const blocked = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+    VALUES('astro-ph',NULL,'2026-10-07T08:00:00Z'::timestamptz)`;
+  const blocked = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(blocked.reason, 'rate_limited', 'a frozen channel is reported as rate limited, not as a run');
   assert.equal((await day('2026-10-07')).attempts, 0, 'an attempt that never ran is given back');
   const held = await sql<{ lease_until: Date }[]>`SELECT lease_until FROM arxiv_collection_state WHERE key='astro-ph'`;
@@ -399,7 +399,7 @@ test('a productive attempt closes the day, and the closed day is not due again',
   enable();
   const hits: string[] = [];
   const fake = serving(() => rssFor(['2610.07001v1']), hits);
-  const first = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const first = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(first.status, 'imported');
   // The feed item is ONE piece of new content: the new announcement and the normal paper it yields
   // are the same fact, so they are not counted twice. What decides the day is the real insert count.
@@ -410,10 +410,10 @@ test('a productive attempt closes the day, and the closed day is not due again',
     'the ordinary round never touches the export API');
   assert.equal(first.day, '2026-10-07');
   assert.equal((await day('2026-10-07')).completed_at !== null, true);
-  assert.equal(await dueAt(), '2026-10-08T01:00:00.000Z', 'a closed day waits for the next UTC anchor');
+  assert.equal(await dueAt(), '2026-10-08T05:30:00.000Z', 'a closed day waits for the next UTC anchor');
   assert.equal(await isDue(new Date('2026-10-07T12:00:00Z')), false);
   const issued = hits.length;
-  const closed = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T13:00:00Z') }));
+  const closed = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T17:30:00Z') }));
   assert.equal(closed.reason, 'completed');
   assert.equal(hits.length, issued, 'a closed day issues no further request');
 });
@@ -422,27 +422,27 @@ test('a failed attempt keeps the day open and its retry runs when the due instan
   await clean();
   enable();
   const down: typeof fetch = async () => { throw new Error('feed down'); };
-  await assert.rejects(collectScheduledArxiv({ fetch: down, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  await assert.rejects(collectScheduledArxiv({ fetch: down, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   const state = await day('2026-10-07');
   assert.equal(state.attempts, 1);
   assert.equal(state.last_outcome, 'failed');
   assert.equal(state.completed_at, null, 'a failure never closes the day');
-  assert.equal(await dueAt(), '2026-10-07T07:00:00.000Z');
+  assert.equal(await dueAt(), '2026-10-07T11:30:00.000Z');
   // A pg-boss retry, a re-delivery or a restart seconds later must not run the collection again.
-  const tooSoon = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T01:00:06Z') }));
+  const tooSoon = skipped(await collectScheduledArxiv({ fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T05:30:06Z') }));
   assert.equal(tooSoon.reason, 'not_due');
   assert.equal((await day('2026-10-07')).attempts, 1, 'a refused re-delivery spends no attempt');
-  const retry = ran(await collectScheduledArxiv({ fetch: serving(() => rssFor(['2610.09001v1'])), sleep: async () => {}, now: at('2026-10-07T07:00:00Z') }));
+  const retry = ran(await collectScheduledArxiv({ fetch: serving(() => rssFor(['2610.09001v1'])), sleep: async () => {}, now: at('2026-10-07T11:30:00Z') }));
   assert.ok(retry.newContentCount > 0);
   assert.equal((await day('2026-10-07')).attempts, 2);
 });
 
 test('pure time helpers agree with the anchors the schedule writes', () => {
   assert.equal(utcDayKey(new Date('2026-10-07T23:59:59Z')), '2026-10-07');
-  assert.equal(utcDayAnchor(new Date('2026-10-07T23:59:59Z')).toISOString(), '2026-10-07T01:00:00.000Z');
-  assert.equal(nextUtcDayAnchor(new Date('2026-10-07T23:59:59Z')).toISOString(), '2026-10-08T01:00:00.000Z');
-  assert.equal(nextUtcDayAnchor(new Date('2026-10-07T00:30:00Z')).toISOString(), '2026-10-07T01:00:00.000Z');
-  assert.equal(nextUtcDayAnchor(new Date('2026-10-07T01:00:00Z')).toISOString(), '2026-10-08T01:00:00.000Z');
+  assert.equal(utcDayAnchor(new Date('2026-10-07T23:59:59Z')).toISOString(), '2026-10-07T05:30:00.000Z');
+  assert.equal(nextUtcDayAnchor(new Date('2026-10-07T23:59:59Z')).toISOString(), '2026-10-08T05:30:00.000Z');
+  assert.equal(nextUtcDayAnchor(new Date('2026-10-07T00:30:00Z')).toISOString(), '2026-10-07T05:30:00.000Z');
+  assert.equal(nextUtcDayAnchor(new Date('2026-10-07T05:30:00Z')).toISOString(), '2026-10-08T05:30:00.000Z');
   assert.equal(ARXIV_COLLECT_MIN_INTERVAL_MS, 6 * 60 * 60 * 1000);
 });
 
@@ -450,23 +450,25 @@ test('finishDueCollectionAttempt is idempotent about the day it is given', async
   await clean();
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at) VALUES('2026-10-07'::date,1,clock_timestamp())`;
   const next = await finishDueCollectionAttempt('2026-10-07', 'empty', {
-    admittedAt: new Date('2026-10-07T01:00:00Z'), clock: at('2026-10-07T01:00:00Z'),
+    admittedAt: new Date('2026-10-07T05:30:00Z'), clock: at('2026-10-07T05:30:00Z'),
   });
-  assert.equal(next, '2026-10-07T07:00:00.000Z');
-  assert.equal(await dueAt(), '2026-10-07T07:00:00.000Z');
+  assert.equal(next, '2026-10-07T11:30:00.000Z');
+  assert.equal(await dueAt(), '2026-10-07T11:30:00.000Z');
   // A later finish for the same day may only push the due instant further out, never back.
   const later = await finishDueCollectionAttempt('2026-10-07', 'empty', {
-    admittedAt: new Date('2026-10-07T02:00:00Z'), clock: at('2026-10-07T02:00:00Z'),
+    admittedAt: new Date('2026-10-07T06:30:00Z'), clock: at('2026-10-07T06:30:00Z'),
   });
-  assert.equal(later, '2026-10-07T08:00:00.000Z');
-  assert.equal(await dueAt(), '2026-10-07T08:00:00.000Z');
+  assert.equal(later, '2026-10-07T12:30:00.000Z');
+  assert.equal(await dueAt(), '2026-10-07T12:30:00.000Z');
 });
 
 // ---------------------------------------------------------------------------------------------
 // R1 — the authoritative admission instant is the DATABASE clock, read after the locks are held.
 // ---------------------------------------------------------------------------------------------
 
-test('R1: the admission instant is the database clock read AFTER the locks, not the caller clock', async () => {
+test('R1: the admission instant is the database clock read AFTER the locks, not the caller clock', async t => {
+  const dbNow = new Date((await sql<{ at: Date }[]>`SELECT clock_timestamp() AS at`)[0]!.at);
+  if (dbNow < utcDayAnchor(dbNow)) return t.skip('real database clock is before the daily anchor');
   await clean();
   // Another connection holds the schedule row's lock, so the admission MUST wait on it.
   let release!: () => void;
@@ -508,62 +510,62 @@ test('R2: a channel really held by another process is refused without spending a
   await sql`INSERT INTO arxiv_collection_state(key,owner,lease_until)
     VALUES('astro-ph',gen_random_uuid(),clock_timestamp()+interval '120 seconds')`;
   const hits: string[] = [];
-  const busy = skipped(await collectScheduledArxiv({ fetch: serving(() => rssFor([]), hits), sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const busy = skipped(await collectScheduledArxiv({ fetch: serving(() => rssFor([]), hits), sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(busy.reason, 'busy', 'a busy channel is reported as busy, not as a failed collection');
   assert.equal(busy.attempts, 0, 'no attempt is spent');
   assert.equal(hits.length, 0, 'and no source request is made');
   assert.equal((await day('2026-10-07')).attempts, 0, 'the day budget is untouched');
   // The read-only gate agrees, so an idle minute leaves no run row either.
-  assert.equal(await isDue(new Date('2026-10-07T01:00:00Z')), false);
+  assert.equal(await isDue(new Date('2026-10-07T05:30:00Z')), false);
 });
 
 test('R2: a late finish from a superseded reservation cannot refund a successor or roll its due back', async () => {
   await clean();
-  const a = await begin(new Date('2026-10-07T01:00:00Z'));
+  const a = await begin(new Date('2026-10-07T05:30:00Z'));
   assert.equal(a.allowed, true);
   assert.equal(a.reservation !== undefined, true, 'an admitted attempt carries a reservation identity');
-  assert.equal(a.nextDueAt, '2026-10-07T07:00:00.000Z');
+  assert.equal(a.nextDueAt, '2026-10-07T11:30:00.000Z');
   // A's run never hands the channel back in this test; the successor only begins once it is free.
   await releaseLease();
-  const b = await begin(new Date('2026-10-07T07:00:00Z'));
+  const b = await begin(new Date('2026-10-07T11:30:00Z'));
   assert.equal(b.allowed, true);
   assert.equal(b.attempt, 2);
-  assert.equal(await dueAt(), '2026-10-07T13:00:00.000Z');
+  assert.equal(await dueAt(), '2026-10-07T17:30:00.000Z');
   // A's finish arrives LATE, after B already owns the day's next attempt.
   const late = await finishDueCollectionAttempt('2026-10-07', 'untouched', {
-    admittedAt: new Date(a.admittedAt), reservation: a.reservation, clock: at('2026-10-07T07:00:05Z'),
+    admittedAt: new Date(a.admittedAt), reservation: a.reservation, clock: at('2026-10-07T11:30:05Z'),
   });
-  assert.equal(late, '2026-10-07T13:00:00.000Z', 'a stale finish returns the CURRENT due instant');
+  assert.equal(late, '2026-10-07T17:30:00.000Z', 'a stale finish returns the CURRENT due instant');
   assert.equal((await day('2026-10-07')).attempts, 2, "and cannot refund a successor's attempt");
-  assert.equal(await dueAt(), '2026-10-07T13:00:00.000Z', "nor roll the due instant back to A's floor");
+  assert.equal(await dueAt(), '2026-10-07T17:30:00.000Z', "nor roll the due instant back to A's floor");
   // A duplicate of the same finish changes nothing either.
   const duplicate = await finishDueCollectionAttempt('2026-10-07', 'untouched', {
-    admittedAt: new Date(a.admittedAt), reservation: a.reservation, clock: at('2026-10-07T07:00:06Z'),
+    admittedAt: new Date(a.admittedAt), reservation: a.reservation, clock: at('2026-10-07T11:30:06Z'),
   });
-  assert.equal(duplicate, '2026-10-07T13:00:00.000Z');
+  assert.equal(duplicate, '2026-10-07T17:30:00.000Z');
   assert.equal((await day('2026-10-07')).attempts, 2);
 });
 
 test('R2: an untouched reservation returns the previous real floor, not a phantom six hours', async () => {
   await clean();
-  // The day already had a real admission at 01:00, so its six-hour floor is 07:00.
-  await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at) VALUES('2026-10-07'::date,1,'2026-10-07T01:00:00Z'::timestamptz)`;
-  const a = await begin(new Date('2026-10-07T07:00:00Z'));
+  // The day already had a real admission at 05:30, so its six-hour floor is 11:30.
+  await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at) VALUES('2026-10-07'::date,1,'2026-10-07T05:30:00Z'::timestamptz)`;
+  const a = await begin(new Date('2026-10-07T11:30:00Z'));
   assert.equal(a.allowed, true);
-  assert.equal(a.nextDueAt, '2026-10-07T13:00:00.000Z', 'the admission writes its provisional floor');
+  assert.equal(a.nextDueAt, '2026-10-07T17:30:00.000Z', 'the admission writes its provisional floor');
   const next = await finishDueCollectionAttempt('2026-10-07', 'untouched', {
-    admittedAt: new Date(a.admittedAt), reservation: a.reservation, clock: at('2026-10-07T07:00:01Z'),
+    admittedAt: new Date(a.admittedAt), reservation: a.reservation, clock: at('2026-10-07T11:30:01Z'),
   });
-  assert.equal(next, '2026-10-07T07:00:00.000Z', 'the floor in force BEFORE the reservation is restored, not a phantom six hours');
+  assert.equal(next, '2026-10-07T11:30:00.000Z', 'the floor in force BEFORE the reservation is restored, not a phantom six hours');
   assert.equal((await day('2026-10-07')).attempts, 1, 'and the reserved attempt is given back');
   await releaseLease();
   // A live hold still bounds the restored floor: a pause that lifts earlier never costs the day a retry.
-  const b = await begin(new Date('2026-10-07T07:00:02Z'));
+  const b = await begin(new Date('2026-10-07T11:30:02Z'));
   assert.equal(b.allowed, true);
   const held = await finishDueCollectionAttempt('2026-10-07', 'untouched', {
-    admittedAt: new Date(b.admittedAt), reservation: b.reservation, holdUntil: '2026-10-07T08:00:00Z', clock: at('2026-10-07T07:00:03Z'),
+    admittedAt: new Date(b.admittedAt), reservation: b.reservation, holdUntil: '2026-10-07T12:30:00Z', clock: at('2026-10-07T11:30:03Z'),
   });
-  assert.equal(held, '2026-10-07T08:00:00.000Z', "the hold's own deadline bounds the restored floor");
+  assert.equal(held, '2026-10-07T12:30:00.000Z', "the hold's own deadline bounds the restored floor");
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -576,8 +578,8 @@ test('R3: an upgrade after a very late previous-day admission keeps the six hour
   // today has no day row yet — exactly the state of a deployment that just migrated.
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at,last_outcome,completed_at)
     VALUES('2026-10-06'::date,1,'2026-10-06T23:30:00Z'::timestamptz,'collected','2026-10-06T23:31:00Z'::timestamptz)`;
-  const early = await begin(new Date('2026-10-07T01:00:00Z'));
-  assert.equal(early.allowed, false, '01:00 is less than six hours after a 23:30 admission');
+  const early = await begin(new Date('2026-10-07T05:29:00Z'));
+  assert.equal(early.allowed, false, '05:29 is less than six hours after a 23:30 admission');
   assert.equal(early.reason, 'not_due');
   assert.equal(early.nextDueAt, '2026-10-07T05:30:00.000Z', "the previous day's real admission owns the floor");
   const at0530 = await begin(new Date('2026-10-07T05:30:00.000Z'));
@@ -589,7 +591,7 @@ test('R3: an upgrade after a very late previous-day admission keeps the six hour
 test('R3: a spent previous day keeps the same six-hour floor', async () => {
   await clean();
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at) VALUES('2026-10-06'::date,3,'2026-10-06T23:30:00Z'::timestamptz)`;
-  const r = await begin(new Date('2026-10-07T01:00:00Z'));
+  const r = await begin(new Date('2026-10-07T05:29:00Z'));
   assert.equal(r.allowed, false);
   assert.equal(r.nextDueAt, '2026-10-07T05:30:00.000Z');
 });
@@ -598,9 +600,9 @@ test('R3: a persisted due instant that is too early is re-calibrated against the
   await clean();
   // A rollback to the old image and a switch back: the schedule row exists, but its instant predates the
   // six hours the last real admission owns, so it must not be trusted over that admission.
-  await sql`INSERT INTO arxiv_collection_schedule(key,next_due_at) VALUES('astro-ph','2026-10-07T01:00:00Z'::timestamptz)`;
+  await sql`INSERT INTO arxiv_collection_schedule(key,next_due_at) VALUES('astro-ph','2026-10-07T05:29:00Z'::timestamptz)`;
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at) VALUES('2026-10-06'::date,1,'2026-10-06T23:30:00Z'::timestamptz)`;
-  const r = await begin(new Date('2026-10-07T01:00:00Z'));
+  const r = await begin(new Date('2026-10-07T05:29:00Z'));
   assert.equal(r.allowed, false, 'a stale, too-early due instant is not trusted over the real admission');
   assert.equal(r.nextDueAt, '2026-10-07T05:30:00.000Z');
 });
@@ -615,7 +617,7 @@ test('R4: RSS evidence alone never closes the day when no raw paper was really s
   const fake = serving(() => rssFor(['2610.07001v1']));
   // Day one really stores the announced version as a raw paper — from the feed itself, with no API
   // request at all. The paper stays a normal pending raw paper from there on.
-  const first = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const first = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(first.insertedPaperCount, 1, 'the announced version was really stored');
   assert.equal((await day('2026-10-07')).completed_at !== null, true);
   // Day two publishes a DIFFERENT feed — the same version, re-announced as a cross-list rather than as
@@ -623,7 +625,7 @@ test('R4: RSS evidence alone never closes the day when no raw paper was really s
   // already stored. The cache row is cleared so the next day really refetches instead of replaying.
   await sql`DELETE FROM arxiv_rss_cache`;
   const second = ran(await collectScheduledArxiv({
-    fetch: serving(() => rssFor(['2610.07001v1'], 'cross')), sleep: async () => {}, now: at('2026-10-08T01:00:00Z'),
+    fetch: serving(() => rssFor(['2610.07001v1'], 'cross')), sleep: async () => {}, now: at('2026-10-08T05:30:00Z'),
   }));
   assert.ok(second.newContentCount > 0, 'the re-announced feed is real RSS evidence');
   assert.equal(second.insertedPaperCount, 0, 'but no raw paper was really stored');
@@ -643,7 +645,7 @@ test('R5: a failed scheduled run leaves its schedule facts as a durable ops even
   enable();
   const runId = (await sql<{ id: number }[]>`INSERT INTO job_runs(job) VALUES('arxiv.collect') RETURNING id`)[0]!.id;
   const down: typeof fetch = async () => { throw new Error('feed down'); };
-  await assert.rejects(collectScheduledArxiv({ fetch: down, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'), jobRunId: runId }));
+  await assert.rejects(collectScheduledArxiv({ fetch: down, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'), jobRunId: runId }));
   const events = await sql<{ code: string; job_run_id: number | null; details: Record<string, unknown> }[]>`
     SELECT code, job_run_id, details FROM ops_error_events WHERE stage='arxiv.collect' AND code='schedule_failed'`;
   assert.equal(events.length, 1, 'the known schedule facts are recorded for the failed run');
@@ -653,7 +655,7 @@ test('R5: a failed scheduled run leaves its schedule facts as a durable ops even
   assert.equal(details.attempt, 1);
   assert.equal(details.retry, false);
   assert.equal(details.scheduleSettled, true);
-  assert.equal(details.nextDueAt, '2026-10-07T07:00:00.000Z');
+  assert.equal(details.nextDueAt, '2026-10-07T11:30:00.000Z');
 });
 
 test('R5: a failed schedule write keeps BOTH the source error and the schedule failure', async () => {
@@ -668,7 +670,7 @@ test('R5: a failed schedule write keeps BOTH the source error and the schedule f
     throw new Error('feed down');
   };
   try {
-    const thrown = await collectScheduledArxiv({ fetch: down, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'), jobRunId: runId }).then(
+    const thrown = await collectScheduledArxiv({ fetch: down, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'), jobRunId: runId }).then(
       () => undefined,
       (error: unknown) => error,
     );
@@ -692,7 +694,9 @@ test('R5: a failed schedule write keeps BOTH the source error and the schedule f
 // ROUND 3 — R1: the instant is read after EVERY admission lock, including the channel state row.
 // ---------------------------------------------------------------------------------------------
 
-test('R1: the admission instant is read AFTER the channel lease is taken, not before the state-row wait', async () => {
+test('R1: the admission instant is read AFTER the channel lease is taken, not before the state-row wait', async t => {
+  const dbNow = new Date((await sql<{ at: Date }[]>`SELECT clock_timestamp() AS at`)[0]!.at);
+  if (dbNow < utcDayAnchor(dbNow)) return t.skip('real database clock is before the daily anchor');
   await clean();
   // Another connection really holds the CHANNEL STATE row — a release, a hold or a renewal in flight.
   // The admission reaches its lease claim and waits there, AFTER it has already sampled a clock.
@@ -724,16 +728,16 @@ test('R1: a midnight crossing while the channel lease was waited on does not cha
   const clock = () => new Date(readings[Math.min(call++, readings.length - 1)]!);
   const admission = await beginDueCollectionAttempt({ clock });
   // The whole admission — the lease claim included — is rolled back and re-decided against the day it
-  // really reached. 00:00:00.100 is before that day's own 01:00 anchor, so nothing is admitted; above
+  // really reached. 00:00:00.100 is before that day's own 05:30 anchor, so nothing is admitted; above
   // all, the attempt is NOT charged to the day that had already ended.
   assert.equal(utcDayKey(new Date(admission.admittedAt)), '2026-10-08',
     'the decision belongs to the day that was really reached');
   assert.equal(admission.allowed, false);
   assert.equal(admission.reason, 'not_due');
-  assert.equal(admission.nextDueAt, '2026-10-08T01:00:00.000Z', "the new day's own anchor is what it waits for");
+  assert.equal(admission.nextDueAt, '2026-10-08T05:30:00.000Z', "the new day's own anchor is what it waits for");
   assert.equal((await dayOrNull('2026-10-07'))?.attempts ?? 0, 0, 'the day that had already ended keeps no attempt');
   assert.equal(await ownerOf(), null, 'and the lease claimed before the roll was not left behind either');
-  assert.equal(await dueAt(), '2026-10-08T01:00:00.000Z');
+  assert.equal(await dueAt(), '2026-10-08T05:30:00.000Z');
 });
 
 test('R1: the finish instant is read AFTER the schedule row lock, not before the wait', async () => {
@@ -742,12 +746,12 @@ test('R1: the finish instant is read AFTER the schedule row lock, not before the
   await sql`INSERT INTO arxiv_collection_day(day,attempts,last_attempt_at) VALUES('2026-10-07'::date,1,clock_timestamp())`;
   const { release, blocker } = await holdRow('arxiv_collection_schedule');
   const startedMs = Date.now();
-  const pending = finishDueCollectionAttempt('2026-10-07', 'empty', { admittedAt: new Date('2026-10-07T01:00:00Z') });
+  const pending = finishDueCollectionAttempt('2026-10-07', 'empty', { admittedAt: new Date('2026-10-07T05:30:00Z') });
   await new Promise(resolve => setTimeout(resolve, 800));
   release();
   await blocker;
   const next = await pending;
-  assert.equal(next, '2026-10-07T07:00:00.000Z');
+  assert.equal(next, '2026-10-07T11:30:00.000Z');
   const row = await schedule();
   const waited = new Date(row!.updated_at).getTime() - startedMs;
   assert.ok(waited >= 500,
@@ -771,7 +775,7 @@ test('R2: an invalid collection configuration is refused before the attempt is r
     ['maxPages', { maxPages: 101 }],
   ] as const) {
     await assert.rejects(
-      collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'), ...options }),
+      collectScheduledArxiv({ fetch: empty, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'), ...options }),
       new RegExp(`Invalid arXiv ${name}`),
     );
     assert.equal(await ownerOf(), null, 'a configuration fault never takes the channel');
@@ -791,7 +795,7 @@ test('R2: a tick the collector turns away hands the channel back, and a release 
     // which is what a configuration change mid-flight looks like. The tick has already spent the attempt
     // and taken the channel, so both have to be handed back.
     const options = {
-      fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'),
+      fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'),
       get maxPages() { process.env.ARXIV_NATIVE_COLLECT_ENABLED = 'false'; return 10; },
     };
     const thrown = await collectScheduledArxiv(options).then(() => undefined, (error: unknown) => error);
@@ -816,7 +820,7 @@ test('R2: a 429 whose hold could not be persisted keeps the channel instead of r
   await armOwnerClearingRefusal();
   try {
     const limited: typeof fetch = async () => new Response('slow down', { status: 429, headers: { 'retry-after': '3600' } });
-    const thrown = await collectScheduledArxiv({ fetch: limited, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') })
+    const thrown = await collectScheduledArxiv({ fetch: limited, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') })
       .then(() => undefined, (error: unknown) => error);
     assert.ok(thrown !== undefined, 'the run still fails');
     assert.match(String(thrown), /429/, 'and the 429 is still the failure a caller reads');
@@ -839,12 +843,12 @@ test('R5: a transient settle failure after a successful run still closes the day
   await armSettleFaultOnce();
   try {
     const fake = serving(() => rssFor(['2610.07001v1']));
-    const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+    const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
     assert.equal(run.insertedPaperCount, 1, 'the run really stored its paper');
     const state = await day('2026-10-07');
     assert.equal(state.last_outcome, 'collected', 'the outcome the run earned survives the transient settle failure');
     assert.notEqual(state.completed_at, null, 'and the day really closes instead of being re-run six hours later');
-    assert.equal(await dueAt(), '2026-10-08T01:00:00.000Z');
+    assert.equal(await dueAt(), '2026-10-08T05:30:00.000Z');
     const events = await sql`SELECT 1 FROM ops_error_events WHERE code='schedule_failed'`;
     assert.equal(events.length, 0, 'a settle that recovered is not reported as a failed run');
   } finally {
@@ -860,14 +864,14 @@ test('R5: a transient settle failure after a tick that never ran still refunds t
     // The same configuration drift as above: the tick reserved the attempt, then the collector's gate
     // turned the run away. The outcome is `untouched`, and the settle that follows it fails once.
     const options = {
-      fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'),
+      fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'),
       get maxPages() { process.env.ARXIV_NATIVE_COLLECT_ENABLED = 'false'; return 10; },
     };
     assert.equal(await collectScheduledArxiv(options), undefined);
     const state = await day('2026-10-07');
     assert.equal(state.attempts, 0, 'the attempt that never ran is refunded, not left spent');
     assert.notEqual(state.last_outcome, 'failed', 'and the tick is not recorded as a failed run');
-    assert.equal(await dueAt(), '2026-10-07T01:00:00.000Z', 'the floor in force before the reservation is restored');
+    assert.equal(await dueAt(), '2026-10-07T05:30:00.000Z', 'the floor in force before the reservation is restored');
   } finally {
     process.env.ARXIV_NATIVE_COLLECT_ENABLED = 'true';
     await disarmSettleFault();
@@ -886,7 +890,7 @@ test('R5: a settle that keeps failing after a successful run keeps the outcome a
     return inner(input);
   };
   try {
-    const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'), jobRunId: runId })
+    const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'), jobRunId: runId })
       .then(() => undefined, (error: unknown) => error);
     assert.ok(thrown !== undefined, 'the tick does not pretend the settle happened');
     assert.match(String(thrown), /the arXiv collected outcome could not be settled/,
@@ -918,7 +922,7 @@ test('F1: cleanup and settlement failing together keeps BOTH the release and the
   await armSettleRefusal();
   try {
     const options = {
-      fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'),
+      fetch: forbidden, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'),
       get maxPages() { process.env.ARXIV_NATIVE_COLLECT_ENABLED = 'false'; return 10; },
     };
     const thrown = await collectScheduledArxiv(options).then(() => undefined, (error: unknown) => error);

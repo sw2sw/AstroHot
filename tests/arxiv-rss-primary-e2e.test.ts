@@ -98,7 +98,7 @@ test('a normal paper goes feed -> raw evidence -> one paid analysis -> report ->
   const log: RequestLog = { rss: 0, api: 0 };
   try {
     const feed = transport(() => rssFeed([{ id: '2610.09001v1' }]), log);
-    const run = ran(await collectScheduledArxiv({ fetch: feed, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+    const run = ran(await collectScheduledArxiv({ fetch: feed, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
     // 1. Collection: the feed alone, and not one export-API request.
     assert.equal(log.api, 0, 'the whole chain never asks the export API');
@@ -144,7 +144,7 @@ test('a normal paper goes feed -> raw evidence -> one paid analysis -> report ->
     // evidence is imported; the version itself is the one already stored.
     await sql`DELETE FROM arxiv_rss_cache`;
     const second = ran(await collectScheduledArxiv({
-      fetch: transport(() => rssFeed([{ id: '2610.09001v1', type: 'cross' }]), log), sleep: async () => {}, now: at('2026-10-08T01:00:00Z'),
+      fetch: transport(() => rssFeed([{ id: '2610.09001v1', type: 'cross' }]), log), sleep: async () => {}, now: at('2026-10-08T05:30:00Z'),
     }));
     assert.equal(second.duplicateCount, 1, 'the version is already stored under its one identity');
     assert.equal(second.insertedPaperCount, 0);
@@ -165,7 +165,7 @@ test('a cross-announcement is stored as evidence but stays out of the paid analy
   const log: RequestLog = { rss: 0, api: 0 };
   try {
     const feed = transport(() => rssFeed([{ id: '2610.09101v1' }, { id: '2610.09102v1', type: 'cross' }]), log);
-    const run = ran(await collectScheduledArxiv({ fetch: feed, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+    const run = ran(await collectScheduledArxiv({ fetch: feed, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
     assert.equal(log.api, 0, 'a cross-announcement is no reason to reach for the export API');
     assert.equal(run.insertedPaperCount, 2, 'both versions are real raw papers');
 
@@ -193,7 +193,7 @@ test('an unreadable feed item is isolated with its own reason while its neighbou
   const log: RequestLog = { rss: 0, api: 0 };
   try {
     const feed = transport(() => rssFeed([{ id: '2610.09201v1' }, { id: '2610.09202v1', abstract: null }]), log);
-    const run = ran(await collectScheduledArxiv({ fetch: feed, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+    const run = ran(await collectScheduledArxiv({ fetch: feed, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
     assert.equal(log.api, 0, 'one unreadable item is no reason to reach for the export API');
     assert.equal(run.insertedPaperCount, 1, 'the readable item was stored');
     assert.equal(run.isolatedCount, 1, 'and the unreadable one was isolated, not silently dropped');

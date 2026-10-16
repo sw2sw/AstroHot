@@ -49,3 +49,9 @@ Set per-minute / hourly / daily limits and account for provider capacity in serv
 6. Before increasing frequency, compare recent new-item counts and budget consumption. Do not overwrite source cursors or reset history.
 
 Manual “Fetch now” is an active network action, and reanalysis may incur additional charges; neither should be used as a read-only check. Changes to environment variables must be reloaded by the relevant processes; editing a file does not mean the changes have taken effect. Saving settings in the admin interface and file-based initialization seeds are also different mechanisms.
+
+## arXiv daily first-attempt anchor
+
+The source anchors the first attempt at **05:30 UTC (13:30 Beijing)**. Each minute only polls durable `next_due_at`; a not-due poll makes no source request. The budget remains three attempts per UTC day with strictly at least six elapsed hours between actual admissions. Empty/failed rounds can therefore retry at 19:30 Beijing and 01:30 the next local day; these are not fixed slots. Productive/partial day closure, operator pauses, HTTP429/Retry-After, leases and paid-receipt protections are unchanged.
+
+An upgrade neither resets spent attempts nor advances an existing retry or later due instant. An admission at 09:00:19 Beijing still owns a floor of 15:00:19 that day; the new first-attempt anchor applies on subsequent days. Source changes are not proof of a production deployment; the operator decides when to run them.
