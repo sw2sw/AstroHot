@@ -7,6 +7,7 @@ import type { ReportIndexResponse, ReportLatestPage, ReportNavigationResponse, S
 import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
+import { loadObservingGuides } from "@aihot/backend/publication/observing-guides";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
@@ -80,6 +81,14 @@ export function registerSite(app: FastifyInstance) {
     // Any cache in front and the home page built from this answer share one absolute deadline.
     reply.header("X-Accel-Expires", `@${Math.floor(Date.now() / 1000) + 60}`);
     return sendJsonWithEtag(req, reply, { ...data, hot }, { etagPrefix: "tl", cacheControl: "public, max-age=60, s-maxage=60" });
+  }));
+
+  app.get("/api/site/observing-guides", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    const ids = (q.ids ?? "").split(",").filter(Boolean);
+    return sendJsonWithEtag(req, reply, await loadObservingGuides(ids, q.cursor || null), {
+      etagPrefix: "guides", cacheControl: "public, max-age=60, s-maxage=60",
+    });
   }));
 
   app.get("/api/site/pool", siteHandler(async (req, reply) => {

@@ -1,11 +1,8 @@
-// 观测指南（/observing-guides）：一份手工维护的收录名单，不是对全站内容的检索结果。
-//
-// 每个 id 都是先读过它自己的公开详情页、确认来源与标题确属观测指导，才写进来的；所以名单可以很短，
-// 也从不说「本站的指南都在这里」。id 被撤回（404）就从名单上拿掉，绝不用本地复制的标题/摘要顶替一个
-// 已经不公开的页面。加一条 id 等于改一次代码，没有 AI 分类、没有模型调用、没有精选分数门槛。
+// 观测指南保留的人工收录名单；自动周刊由公共读取层补充。
+// 这里只保存文章身份，不决定显示次序；合并列表统一按文章发布时间倒序分页。
 import type { SiteItemDetail } from "@aihot/contracts/site";
 
-/** 收录的指南 id，顺序即页面上读者看到的顺序。 */
+/** 保留原有人工收录身份；展示次序由公共读取层的发布时间排序决定。 */
 export const OBSERVING_GUIDE_IDS = [
   // 本发行包不附带任何第三方指南条目：此前收录的 id 指向私有部署里的具体文章，
   // 已随第三方内容素材一并移除。列表为空时页面显示明确的空态，不编造、不用占位卡顶替。
@@ -30,6 +27,7 @@ export type GuideOutcome =
   | { kind: "unreadable" };
 
 export interface GuidesView {
+  nextCursor?: string | null;
   guides: GuideCard[];
   /** 公开详情已没有这一页（404）的 id 数：从列表里悄悄去掉，不做成占位卡。 */
   withdrawn: number;
