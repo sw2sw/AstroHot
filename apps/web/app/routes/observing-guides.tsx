@@ -1,8 +1,6 @@
-// 观测指南：一份手工收录的观星指南名单（features/observing-guides/guides.ts），逐 id 走站内公开详情接口。
-// 读不到的 id 不阻塞读得到的；撤回的 id 从列表上消失。页面只放收录的这几篇，不是全站指南的检索结果。
+// 观测指南：人工收录与两个固定周刊，公共读取层统一按来源发布时间分页。
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/observing-guides";
-import type { SiteItemDetail } from "@aihot/contracts/site";
 import { ApiError, apiGet, edgeTtl } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { fullDateTime } from "../lib/format";
@@ -10,23 +8,20 @@ import { MathText } from "../components/MathText";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import { EmptyState } from "../components/ui/Page";
 import type { Screen } from "../components/shell/screens";
-import { OBSERVING_GUIDE_IDS, guidesState, guidesView, toGuideCard, type GuideCard, type GuideOutcome, type GuidesView } from "../features/observing-guides/guides";
+import { OBSERVING_GUIDE_IDS, guidesState, type GuideCard, type GuidesView } from "../features/observing-guides/guides";
 
 export const handle: Screen = { home: "featured", name: "观测指南" };
 
-/** 一条 id：取到就有卡，404 就是已撤回，其余是这一次没读到——一条 id 从不影响另一条。 */
-async function loadGuide(id: string, signal: AbortSignal): Promise<GuideOutcome> {
+export async function loader({ request }: Route.LoaderArgs): Promise<GuidesView> {
+  const params = new URLSearchParams({ ids: OBSERVING_GUIDE_IDS.join(",") });
+  const cursor = new URL(request.url).searchParams.get("cursor");
+  if (cursor) params.set("cursor", cursor);
   try {
-    const item = await apiGet<SiteItemDetail>(`/api/site/items/${id}`, { signal });
-    return { kind: "guide", card: toGuideCard(item) };
+    return await apiGet<GuidesView>(`/api/site/observing-guides?${params}`, { signal: request.signal });
   } catch (error) {
-    return error instanceof ApiError && error.status === 404 ? { kind: "withdrawn" } : { kind: "unreadable" };
+    if (error instanceof ApiError && error.status === 400) throw error;
+    return { guides: [], withdrawn: 0, unreadable: 1, nextCursor: null };
   }
-}
-
-export async function loader({ request }: Route.LoaderArgs) {
-  const outcomes = await Promise.all(OBSERVING_GUIDE_IDS.map((id) => loadGuide(id, request.signal)));
-  return guidesView(outcomes);
 }
 
 export function headers() {
@@ -73,14 +68,15 @@ export function ObservingGuidesPage({ view }: { view: GuidesView }) {
           <ul className="mt-2 lg:mt-4 lg:space-y-3">
             {view.guides.map((guide) => <GuideListItem key={guide.id} guide={guide} />)}
           </ul>
-          {view.unreadable > 0 && <p className="mt-4 text-[12.5px] text-ink-4">还有 <span className="num">{view.unreadable}</span> 篇这次没有读到，稍后再来看看。</p>}
+          {view.nextCursor && <Link className="mt-4 inline-block py-3 text-accent" to={`?cursor=${encodeURIComponent(view.nextCursor)}`}>下一页 →</Link>}
+          {view.unreadable > 0 && <p className="mt-4 text-[12.5px] text-ink-4">部分观测指南这次没有读到，稍后再来看看。</p>}
         </>
       ) : (
         <div className="mt-4 lg:card">
           {state === "unavailable" ? (
-            <EmptyState title="观测指南暂时打不开">这份名单上的指南这次没有读到，不是没有收录。稍后再来看看。</EmptyState>
+            <EmptyState title="观测指南暂时打不开">观测指南这次没有读到，稍后再来看看。</EmptyState>
           ) : (
-            <EmptyState title="暂时没有可用的观测指南">这里只放逐篇读过的观星指南，有新的会再加进来；也可以先看天象日历。</EmptyState>
+            <EmptyState title="暂时没有可用的观测指南">也可以先看天象日历。</EmptyState>
           )}
         </div>
       )}

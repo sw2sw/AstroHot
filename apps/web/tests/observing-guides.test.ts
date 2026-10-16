@@ -70,11 +70,12 @@ after(async () => { await vite?.close(); });
 
 // —— 收录名单 ——
 
-test("收录名单是显式维护的 id 列表：本发行包为空，且不按分数或精选筛选", () => {
+test("公开发行包保持空人工名单，自动读取不按分数或精选筛选", () => {
   assert.deepEqual([...OBSERVING_GUIDE_IDS], GUIDE_IDS);
+  assert.equal(new Set(OBSERVING_GUIDE_IDS).size, GUIDE_IDS.length, "每篇只收录一次");
   const route = source("../app/routes/observing-guides.tsx");
-  // 逐 id 走公开详情，不扫分页池、不按热度或精选门槛挑。
-  assert.match(route, /\/api\/site\/items\/\$\{id\}/, "逐 id 用公开详情 helper");
+  // 一次有界栏目查询，不扫分页池、不按热度或精选门槛挑。
+  assert.match(route, /\/api\/site\/observing-guides/, "使用公共指南读取层");
   assert.doesNotMatch(route, /\/api\/site\/(pool|timeline)/, "不从分页池推断收录名单");
   assert.doesNotMatch(route, /\b(score|selected)\b/, "不设精选分数门槛");
   assert.doesNotMatch(route, /openai|chatapi|model|prompt/i, "不新增模型调用或 AI 分类");
@@ -126,23 +127,31 @@ test("一个 id 的结果不影响另一个：撤回不留占位卡，读不到�
 
 // —— 加载器 ——
 
-test("加载器只读显式名单：本发行包名单为空，不请求任何 id，返回诚实的空态", async () => {
+test("加载器一次请求公共指南页，保留具体标题、日期、分页及诚实错误态", async () => {
   const { loader } = await vite.ssrLoadModule("/app/routes/observing-guides.tsx");
   const original = globalThis.fetch;
-  const called: string[] = [];
-  const stub = (async (input: unknown) => {
-    called.push(String(input));
-    return jsonResponse({ code: "not_found" }, 404);
-  }) as typeof fetch;
+  const called: URL[] = [];
+  const fixture = { guides: FIXTURE_IDS.map((id) => toGuideCard(DETAIL_FIXTURE[id] as never)), withdrawn: 0, unreadable: 0, nextCursor: "guides1.synthetic" };
   try {
-    globalThis.fetch = stub;
-    const view = await loader({ request: new Request("http://localhost/observing-guides") } as never);
-    assert.deepEqual(called, GUIDE_IDS, "名单为空时不请求任何 id");
-    assert.deepEqual(view, { guides: [], withdrawn: 0, unreadable: 0 });
-    assert.equal(guidesState(view), "empty", "空名单是空态，不是读不到");
-  } finally {
-    globalThis.fetch = original;
-  }
+    globalThis.fetch = (async (input: unknown) => {
+      called.push(new URL(String(input)));
+      return jsonResponse(fixture);
+    }) as typeof fetch;
+    const view = await loader({ request: new Request("http://localhost/observing-guides?cursor=guides1.previous") } as never);
+    assert.equal(called.length, 1);
+    assert.equal(called[0]!.pathname, "/api/site/observing-guides");
+    assert.equal(called[0]!.searchParams.get("ids"), GUIDE_IDS.join(","));
+    assert.equal(called[0]!.searchParams.get("cursor"), "guides1.previous");
+    assert.deepEqual(view, fixture);
+    const html = await renderPage(view);
+    assert.match(html, /href="\/?\?cursor=guides1.synthetic"/);
+    assert.match(html, /2026-10-09 16:56/);
+    assert.ok(!html.includes("2026-10-11 09:42"), "采集时间不显示为文章发布时间");
+    const undated = await renderPage({ ...view, guides: [{ ...view.guides[0], publishedAt: null }] });
+    assert.doesNotMatch(undated, /2026-10-09 16:56/);
+    globalThis.fetch = (async () => jsonResponse({}, 503)) as typeof fetch;
+    assert.equal(guidesState(await loader({ request: new Request("http://localhost/observing-guides") } as never)), "unavailable");
+  } finally { globalThis.fetch = original; }
 });
 
 // —— 页面 ——
@@ -185,7 +194,7 @@ test("部分失败时正常项照常可用，只用一句话说明还有没读�
   const html = await renderPage(view);
   assert.match(html, new RegExp(`data-guide-id="${GUIDE_A}"`));
   assert.equal((html.match(/data-guide-id/g) ?? []).length, 1);
-  assert.match(html, /还有 <span class="num">1<\/span> 篇这次没有读到/);
+  assert.match(html, /部分观测指南这次没有读到/);
   assert.doesNotMatch(html, /data-guides-state="unavailable"/);
 });
 
