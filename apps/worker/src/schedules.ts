@@ -31,6 +31,8 @@ import { sourceHealthWeekly } from "@aihot/backend/operations/reports";
 
 interface Scheduled {
   name: string;
+  queue?: string;
+  policy?: "exclusive";
   cron: string;
   // The job_runs row id is handed to every entry so a failure event can name the run it belongs to;
   // an entry that has nothing to record simply ignores it.
@@ -54,8 +56,8 @@ const collecting = process.env.COLLECT_ENABLED === "true";
 const DEFAULT_TZ = "Asia/Shanghai";
 
 /** The queue of a cron entry. policy is fixed at creation; the rest is corrected when it drifted. */
-export function scheduleQueueOptions(schedule: Pick<Scheduled, "retryLimit">) {
-  return { policy: "singleton" as const, retryLimit: schedule.retryLimit ?? 1, expireInSeconds: 3600 };
+export function scheduleQueueOptions(schedule: Pick<Scheduled, "retryLimit" | "policy">) {
+  return { policy: schedule.policy ?? "singleton" as const, retryLimit: schedule.retryLimit ?? 1, expireInSeconds: 3600 };
 }
 
 export const SCHEDULES: Scheduled[] = [
@@ -65,7 +67,12 @@ export const SCHEDULES: Scheduled[] = [
     : []),
   ...(process.env.ARXIV_REPORT_URL ? [{ name: "arxiv.sync", cron: "*/30 * * * *", run: () => syncArxivReport() }] : []),
   ...(process.env.ARXIV_ANALYSIS_ENABLED === "true" && process.env.MODEL_CALLS_ENABLED === "true"
-    ? [{ name: "arxiv.analyze", cron: "*/30 * * * *", run: (runId: number) => analyzePendingArxiv({ limit: 20, jobRunId: runId }) }]
+    // singleton only excludes overlapping ACTIVE jobs; minute ticks would still build a backlog.
+    // A new exclusive queue drops ticks while one batch is queued/running, across workers too.
+    // Policy is immutable on existing pg-boss queues, so do not reuse the old singleton queue.
+    // The next minute (plus queue polling) checks again; this is not a second-level drain loop.
+    ? [{ name: "arxiv.analyze", queue: "cron.arxiv.analyze.continuous", policy: "exclusive" as const, retryLimit: 0,
+         cron: "* * * * *", run: (runId: number) => analyzePendingArxiv({ limit: 20, jobRunId: runId }) }]
     : []),
   ...(process.env.ARXIV_DAILY_REPORT_ENABLED === "true"
     ? [{ name: "arxiv.daily-report", cron: "7,37 * * * *", run: () => composeArxivDailyReport() }]
@@ -133,7 +140,7 @@ export const SCHEDULES: Scheduled[] = [
 
 export async function registerSchedules(boss: PgBoss) {
   for (const s of SCHEDULES) {
-    const queue = `cron.${s.name}`;
+    const queue = s.queue ?? `cron.${s.name}`;
     await ensureQueue(queue, scheduleQueueOptions(s));
     await boss.schedule(queue, s.cron, {}, { tz: s.tz ?? DEFAULT_TZ, missed: s.missed ?? "skip" });
     // Schedules fire at minute boundaries; a 15 s pickup keeps them on time with a third of the polling.
@@ -160,7 +167,7 @@ export async function registerSchedules(boss: PgBoss) {
   // old key queued forever. Drop every cron entry that is gone from this list OR whose expression or
   // time zone no longer matches, otherwise a retired slot keeps firing (and would, for example, spend
   // the arXiv collection's daily attempt budget).
-  const current = new Map(SCHEDULES.map((s) => [`cron.${s.name}`, { cron: s.cron, tz: s.tz ?? DEFAULT_TZ }]));
+  const current = new Map(SCHEDULES.map((s) => [s.queue ?? `cron.${s.name}`, { cron: s.cron, tz: s.tz ?? DEFAULT_TZ }]));
   for (const old of await boss.getSchedules()) {
     if (!old.name.startsWith("cron.")) continue;
     const wanted = current.get(old.name);
