@@ -5,8 +5,9 @@ import { loadObservingGuides, autoGuidesStart } from '../packages/backend/src/pu
 import Fastify from 'fastify';
 import { registerSite } from '../apps/api/src/routes/site.ts';
 
-// Synthetic fixture data only. This suite may run only against its own disposable loopback DB.
-assert.equal(process.env.DATABASE_URL, 'postgres://postgres:fixture@127.0.0.1:55459/observing_guides_test');
+// Use the runner's migrated per-file database, guarded as throwaway by setup.ts.
+// Synthetic fixture data only; no fixed local port or credentials.
+import './setup.ts';
 globalThis.fetch = async () => { throw new Error('network/source/model access forbidden'); };
 const start = '2026-10-16T08:00:00Z';
 process.env.OBSERVING_GUIDES_AUTO_START_AT = start;
@@ -14,24 +15,23 @@ after(async () => { await closeDb(); });
 let ready: Promise<void>;
 async function setup() {
   ready ??= (async () => {
-    await sql`CREATE TABLE sources(id text PRIMARY KEY, name text, participation_mode text)`;
-    await sql`CREATE TABLE articles(id text PRIMARY KEY, url text, title text, raw jsonb, discovered_at timestamptz, backfill boolean)`;
-    await sql`CREATE TABLE publications(article_id text PRIMARY KEY, source_id text, title text, summary text, published_at timestamptz, visibility text, selected boolean, visible_after timestamptz)`;
-    await sql`INSERT INTO sources VALUES ('astro','Astronomy Magazine · News','editorial'),('sky','Sky & Telescope · 天文新闻','editorial'),('other','Unapproved source','editorial'),('signal','Astronomy Magazine · News','hot_signal')`;
+    await sql`INSERT INTO sources (id, name, kind, participation_mode) VALUES ('astro','Astronomy Magazine · News','rss','editorial'),('sky','Sky & Telescope · 天文新闻','rss','editorial'),('other','Unapproved source','rss','editorial'),('signal','Astronomy Magazine · News','rss','hot_signal')`;
   })();
   await ready;
-  await sql`TRUNCATE articles, publications`;
+  await sql`DELETE FROM publications`;
+  await sql`DELETE FROM articles`;
 }
 async function add(id: string, opts: Record<string, any> = {}) {
   const sky = opts.sky === true;
   const article = {
-    id, url: sky ? 'https://skyandtelescope.org/astronomy-news/future-weekly-permalink/' : 'https://www.astronomy.com/the-sky-this-week/synthetic-next-week/',
+    id, source_id: sky ? 'sky' : 'astro', identity_key: id, timeline_at: new Date('2026-10-23T05:00:00Z'),
+    url: sky ? 'https://skyandtelescope.org/astronomy-news/future-weekly-permalink/' : 'https://www.astronomy.com/the-sky-this-week/synthetic-next-week/',
     title: sky ? "This Week's Sky at a Glance, October 23 – 30" : 'The Sky This Week from October 23 to 30: Mars',
     raw: sky ? { categories: ['Sky at a Glance'] } : {},
     discovered_at: new Date('2026-10-16T08:00:01Z'), backfill: false, ...opts.article,
   };
   await sql`INSERT INTO articles ${sql(article)}`;
-  await sql`INSERT INTO publications ${sql({ article_id: id, source_id: sky ? 'sky' : 'astro', title: `具体中文篇名 ${id}：火星与星团`, summary: '现有公开摘要', published_at: new Date('2026-10-23T05:00:00Z'), visibility: 'public', selected: false, visible_after: null, ...opts.publication })}`;
+  await sql`INSERT INTO publications ${sql({ article_id: id, channel: 'news', url: article.url, discovered_at: article.discovered_at, timeline_at: article.timeline_at, sort_at: article.timeline_at, source_id: sky ? 'sky' : 'astro', title: `具体中文篇名 ${id}：火星与星团`, summary: '现有公开摘要', published_at: new Date('2026-10-23T05:00:00Z'), visibility: 'public', selected: false, visible_after: null, ...opts.publication })}`;
 }
 
 test('merged manual/automatic set sorts by trusted publication time; dedup, ties, nulls and cursor pages', async () => {
