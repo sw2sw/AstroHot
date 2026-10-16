@@ -39,7 +39,9 @@ import { ARXIV_COLLECTION_KEY, claimCollectionWithin, type CollectionState } fro
 export { ARXIV_COLLECTION_KEY };
 
 /** The UTC hour the day's first attempt is anchored to. */
-export const ARXIV_COLLECT_FIRST_HOUR_UTC = 1;
+export const ARXIV_COLLECT_FIRST_HOUR_UTC = 5;
+/** The UTC minute of the first attempt: 05:30 UTC is 13:30 in Beijing. */
+export const ARXIV_COLLECT_FIRST_MINUTE_UTC = 30;
 /** The day's real admission cap: the first attempt plus at most two retries. */
 export const ARXIV_COLLECT_ATTEMPTS_PER_DAY = 3;
 /** The spacing between two real admissions of one day. Strictly a lower bound. */
@@ -70,13 +72,13 @@ export function utcDayKey(at: Date): string {
   return at.toISOString().slice(0, 10);
 }
 
-/** The day's first-attempt anchor: 01:00 UTC of the UTC day `at` falls in. */
+/** The day's first-attempt anchor: 05:30 UTC of the UTC day `at` falls in. */
 export function utcDayAnchor(at: Date): Date {
-  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate(), ARXIV_COLLECT_FIRST_HOUR_UTC));
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate(), ARXIV_COLLECT_FIRST_HOUR_UTC, ARXIV_COLLECT_FIRST_MINUTE_UTC));
 }
 
 /**
- * The next 01:00 UTC anchor strictly after `at`. Used to push a closed or exhausted day to the next
+ * The next 05:30 UTC anchor strictly after `at`. Used to push a closed or exhausted day to the next
  * day's first attempt instead of letting it slide within the current day.
  */
 export function nextUtcDayAnchor(at: Date): Date {
@@ -154,7 +156,7 @@ export function resolveDue(inputs: DueInputs): DueVerdict {
     // The most recent real admission's six hours, so a too-early persisted due instant (an upgrade, or a
     // rollback that left a stale value behind) can never let the channel run early.
     floor,
-    // Midnight to 01:00 UTC never starts the next day early: the day's first attempt is anchored.
+    // Midnight to 05:30 UTC never starts the next day early: the day's first attempt is anchored.
     anchor,
   );
   // Not due yet: the tick is refused on the clock alone, whatever the channel happens to be doing. A

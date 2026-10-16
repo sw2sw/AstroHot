@@ -133,7 +133,7 @@ test('the default RSS round issues zero export-API requests, even though that en
   const log = newLog();
   // No `api` handler at all: reaching the export endpoint is an immediate, unmistakable failure.
   const fake = transport({ feed: () => feedFor([{ id: '2610.07001v1' }, { id: '2610.07002v1', type: 'cross' }]), log });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.equal(log.api, 0, 'the ordinary round never asks the export API');
   assert.equal(log.rss, 1, 'and it really read the announcement feed exactly once');
@@ -162,13 +162,13 @@ test('a round whose feed carries already-stored versions stores nothing new and 
   withoutWindow();
   const log = newLog();
   const dayOne = transport({ feed: () => feedFor([{ id: '2610.07001v1' }]), log });
-  assert.equal(ran(await collectScheduledArxiv({ fetch: dayOne, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') })).insertedPaperCount, 1);
+  assert.equal(ran(await collectScheduledArxiv({ fetch: dayOne, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') })).insertedPaperCount, 1);
   // Day two publishes a DIFFERENT document — the same version re-announced as a cross-list — so a
   // brand-new batch of evidence is really imported while the version itself is already stored. The
   // cache row is cleared so the next day really refetches instead of replaying the cached answer.
   await sql`DELETE FROM arxiv_rss_cache`;
   const dayTwo = transport({ feed: () => feedFor([{ id: '2610.07001v1', type: 'cross' }]), log });
-  const second = ran(await collectScheduledArxiv({ fetch: dayTwo, sleep: async () => {}, now: at('2026-10-08T01:00:00Z') }));
+  const second = ran(await collectScheduledArxiv({ fetch: dayTwo, sleep: async () => {}, now: at('2026-10-08T05:30:00Z') }));
   assert.equal(second.rssItemCount, 1, 'the feed really listed one item');
   assert.equal(second.duplicateCount, 1, 'and that version was already stored, from the first source that described it');
   assert.equal(second.insertedPaperCount, 0, 'nothing new was really stored');
@@ -198,7 +198,7 @@ test('the supplement is only attempted when explicitly enabled, and its hydratio
     api: url => new Response(atomFor((url.searchParams.get('id_list') ?? '').split(',').filter(Boolean))),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.equal(run.apiSupplementAttempted, true, 'the explicitly enabled supplement really ran');
   assert.equal(run.isolatedCount, 1, 'the feed item with no abstract was isolated rather than dropped');
@@ -235,7 +235,7 @@ test('a supplement that fails at the HTTP level only records its own failure: th
     api: () => new Response('the export API is unwell today', { status: 503 }),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.equal(run.apiSupplementAttempted, true);
   assert.match(String(run.apiSupplementFailed), /503/, 'the supplement failure is named on the result');
@@ -274,7 +274,7 @@ test('a supplement that times out is the same kind of its own failure, and the f
     api: () => { throw new Error('arXiv request timed out after 90000ms'); },
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.match(String(run.apiSupplementFailed), /timed out/);
   assert.equal(run.insertedPaperCount, 1);
@@ -296,7 +296,7 @@ test('a supplement that answers with something that is not Atom fails the same w
     api: () => new Response('<html><body>not an Atom feed at all</body></html>'),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.ok(run.apiSupplementFailed !== undefined, 'a body that is not Atom is a supplement failure too');
   assert.equal(run.insertedPaperCount, 1, 'and it cannot reach back and undo the stored feed papers');
@@ -318,7 +318,7 @@ test('a supplement batch rejected by the version red line is its own classificat
     api: () => new Response(atomFor(['2610.07002v2'])),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.match(String(run.apiSupplementBatchRejected), /whole batch rejected/,
     'the rejection is named on the result as the rejection it is');
@@ -355,7 +355,7 @@ test('an ordinary supplement HTTP failure carries the response evidence the tran
     api: () => new Response('the export API is unwell today', { status: 503 }),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   assert.match(String(run.apiSupplementFailed), /503/);
   assert.equal(run.apiSupplementBatchRejected, undefined, 'a 503 is a transport fault, not a judged refusal');
@@ -400,7 +400,7 @@ test('a supplement failure body cut by the byte budget keeps the real prefix as 
   const budget = Buffer.byteLength(feed) + 16;
   const oversized = 'X'.repeat(budget + 500);
   const fake = transport({ feed: () => feed, api: () => new Response(oversized, { status: 503 }), log });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'), maxBytes: budget }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'), maxBytes: budget }));
 
   assert.match(String(run.apiSupplementFailed), /503/);
   const [kept] = await evidenceRow('api_supplement_failed');
@@ -424,7 +424,7 @@ test('a supplement timeout honestly reports that no response evidence exists at 
     api: () => { throw new Error('arXiv request timed out after 90000ms'); },
     log,
   });
-  ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
 
   const details = (await events('api_supplement_failed'))[0]!.details;
   assert.equal(details.httpStatus, null, 'a timeout never saw an origin response, so no status is invented');
@@ -450,7 +450,7 @@ test('a dead feed stays THE failure even when the supplement beside it committed
   const firstLog = newLog();
   const first = ran(await collectScheduledArxiv({
     fetch: transport({ feed: () => feedFor([{ id: '2610.07001v1' }, { id: '2610.07002v1', abstract: null }]), log: firstLog }),
-    sleep: async () => {}, now: at('2026-10-07T01:00:00Z'),
+    sleep: async () => {}, now: at('2026-10-07T05:30:00Z'),
   }));
   assert.equal(first.insertedPaperCount, 1);
   assert.deepEqual((await rawRows()).map(row => row.arxiv_id), ['2610.07001v1']);
@@ -466,7 +466,7 @@ test('a dead feed stays THE failure even when the supplement beside it committed
         api: url => new Response(atomFor((url.searchParams.get('id_list') ?? '').split(',').filter(Boolean))),
         log,
       }),
-      sleep: async () => {}, now: at('2026-10-08T01:00:00Z'),
+      sleep: async () => {}, now: at('2026-10-08T05:30:00Z'),
     }),
     (error: Error & { supplementCommittedBesideTheFailure?: { responses: number; ingested: number; inserted: number } }) => {
       assert.match(error.message, /arXiv announcement feed failed/,
@@ -499,7 +499,7 @@ test('a 429 during the supplement establishes the shared hold and still keeps th
     api: () => new Response('slow down', { status: 429, headers: { 'retry-after': '3600' } }),
     log,
   });
-  const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') })
+  const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') })
     .then(() => undefined, (error: unknown) => error);
   // RSS-U4: a 429 on the SUPPLEMENT is an auxiliary failure. The shared hold is established first and
   // the source stops, but the round is NOT rewritten as a total failure — the papers the feed really
@@ -527,7 +527,7 @@ test('a 429 during the supplement establishes the shared hold and still keeps th
   // The hold still bounds the channel. The day is finished, so the tick reports that first, and the
   // hold is left exactly where the 429 put it: nothing is dispatched and nothing is cleared.
   const issued = log.hrefs.length;
-  const blocked = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T07:00:22.909Z') }));
+  const blocked = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T11:30:22.909Z') }));
   assert.equal(blocked.reason, 'completed', 'the day is done, and it is reported as done');
   assert.equal(log.hrefs.length, issued, 'and not one further RSS or API request is made');
   const stillHeld = (await sql<{ lease_until: Date | null }[]>`
@@ -549,13 +549,13 @@ test('a 429 on a round that stored nothing keeps the day open, and the hold is w
     api: () => new Response('slow down', { status: 429, headers: { 'retry-after': '3600' } }),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(run.insertedPaperCount, 0, 'nothing was really stored');
   assert.equal(run.partial, true);
   assert.equal((await day('2026-10-07')).completed_at, null, 'so the day keeps its retry budget');
 
   const issued = log.hrefs.length;
-  const blocked = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T07:00:22.909Z') }));
+  const blocked = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T11:30:22.909Z') }));
   assert.equal(blocked.reason, 'rate_limited', 'the live shared hold is what refuses the retry');
   assert.equal(log.hrefs.length, issued, 'and it dispatches nothing at all');
 });
@@ -585,7 +585,7 @@ test('a supplement 429 whose hold cannot be persisted fails closed instead of re
   await sql`CREATE TRIGGER arxiv_test_block_hold BEFORE UPDATE ON arxiv_collection_state
    FOR EACH ROW EXECUTE FUNCTION arxiv_test_block_hold()`;
   try {
-    const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') })
+    const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') })
       .then(() => undefined, (error: unknown) => error);
     assert.ok(thrown !== undefined, 'an unpersistable pause is not a resolved round');
     assert.ok(thrown instanceof AggregateError, 'both facts are reported together');
@@ -635,7 +635,7 @@ test('the supplement never reopens the legacy submission window, and the window 
     api: url => new Response(atomFor((url.searchParams.get('id_list') ?? '').split(',').filter(Boolean))),
     log,
   });
-  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const run = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(run.apiSupplementAttempted, true, 'the supplement really ran');
   assert.equal(log.api, 1, 'and the gap-fill is the round\'s ONLY export-API request');
   assert.deepEqual(windowQueries(log), [], 'the submission-date window stays closed even though the supplement ran');
@@ -656,7 +656,7 @@ test('the supplement never reopens the legacy submission window, and the window 
     api: () => new Response(atomFor([])),
     log: windowed,
   });
-  const second = ran(await collectScheduledArxiv({ fetch: windowOnly, sleep: async () => {}, now: at('2026-10-08T01:00:00Z') }));
+  const second = ran(await collectScheduledArxiv({ fetch: windowOnly, sleep: async () => {}, now: at('2026-10-08T05:30:00Z') }));
   assert.equal(second.apiSupplementAttempted, false, 'the supplement is off and was not attempted');
   assert.equal(windowQueries(windowed).length, 1, 'the window really walked its fixed range');
   assert.equal(second.complete, true);
@@ -675,7 +675,7 @@ test('one round spends a bounded supplement budget and leaves the rest as candid
     log,
   });
   const first = ran(await collectScheduledArxiv({
-    fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z'),
+    fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z'),
     supplementBatchIds: 2, supplementMaxRequests: 1,
   }));
   // The read is bounded by what the round could actually send, so a switch can never answer a large
@@ -693,7 +693,7 @@ test('one round spends a bounded supplement budget and leaves the rest as candid
   const secondLog = newLog();
   const second = ran(await collectScheduledArxiv({
     fetch: transport({ feed: () => feedFor([]), api: url => new Response(atomFor((url.searchParams.get('id_list') ?? '').split(',').filter(Boolean))), log: secondLog }),
-    sleep: async () => {}, now: at('2026-10-08T01:00:00Z'),
+    sleep: async () => {}, now: at('2026-10-08T05:30:00Z'),
     supplementBatchIds: 2, supplementMaxRequests: 1,
   }));
   assert.deepEqual(apiIds(secondLog).filter((ids): ids is string => ids !== null), ['2610.07803v1,2610.07804v1'],
@@ -719,7 +719,7 @@ test('a failed feed is the failure the round reports, and the supplement never s
     api: () => new Response('the export API is unwell today', { status: 503 }),
     log,
   });
-  const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') })
+  const thrown = await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') })
     .then(() => undefined, (error: unknown) => error);
   assert.match(String(thrown), /announcement feed failed/,
     'the main source failure is what the caller reads, never the auxiliary one');
@@ -746,7 +746,7 @@ test('an operator pause is never lifted, shortened or paid for by the RSS-primar
     VALUES('astro-ph',NULL,clock_timestamp()+interval '2 hours')`;
   const log = newLog();
   const fake = transport({ feed: () => feedFor([{ id: '2610.07001v1' }]), log });
-  const paused = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:00Z') }));
+  const paused = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:00Z') }));
   assert.equal(paused.reason, 'rate_limited', 'the manual pause still freezes the channel');
   assert.equal(log.hrefs.length, 0, 'and the round reaches neither endpoint');
   assert.equal((await day('2026-10-07')).attempts, 0, 'an attempt that never ran is still given back');
@@ -763,15 +763,15 @@ test('a round that stored nothing keeps the day open, and its retry runs exactly
   // An empty feed: the ordinary round really ran, really read the feed, and really stored nothing — so
   // the six hours the schedule owes are what is under test, not a day that closed on a stored paper.
   const fake = transport({ feed: () => feedFor([]), log });
-  const first = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T01:00:20.000Z') }));
+  const first = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T05:30:20.000Z') }));
   assert.equal(first.newContentCount, 0);
   assert.equal(log.api, 0, 'an empty feed still never reaches the export API');
   assert.equal((await day('2026-10-07')).completed_at, null, 'an unproductive day stays open for its retry');
   const issued = log.hrefs.length;
-  const early = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T07:00:19.999Z') }));
+  const early = skipped(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T11:30:19.999Z') }));
   assert.equal(early.reason, 'not_due', 'one millisecond early is still early');
   assert.equal(log.hrefs.length, issued, 'and the tick before the due instant touches nothing at all');
-  const retry = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T07:00:20.000Z') }));
+  const retry = ran(await collectScheduledArxiv({ fetch: fake, sleep: async () => {}, now: at('2026-10-07T11:30:20.000Z') }));
   assert.equal(retry.retry, true, 'exactly six hours later the day\'s retry really runs');
   assert.equal(retry.attempt, 2);
 });

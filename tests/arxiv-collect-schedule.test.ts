@@ -51,7 +51,7 @@ test('the first productive attempt of the UTC day closes the day for the remaini
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const hits:string[]=[];
  const fake=serving(()=>rssFor(['2610.07001v1']),hits);
- const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  assert.equal(first.status,'imported');
  assert.equal(first.newContentCount,2,'the new announcement and its hydrated version both count as new content');
  const requestCount=hits.length;
@@ -69,8 +69,8 @@ test('attempts that find nothing new exhaust the UTC day budget and never exceed
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const hits:string[]=[];
  const empty=serving(()=>rssFor([]),hits);
- for(const hour of ['01','07','13']){
-  const run=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at(`2026-10-07T${hour}:00:00Z`)}));
+ for(const hour of ['05','11','17']){
+  const run=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at(`2026-10-07T${hour}:30:00Z`)}));
   assert.equal(run.newContentCount,0,'an empty feed and an empty window store nothing new');
   assert.equal((await day('2026-10-07')).last_outcome,'empty');
  }
@@ -78,10 +78,10 @@ test('attempts that find nothing new exhaust the UTC day budget and never exceed
  assert.equal(state.attempts,ARXIV_COLLECT_ATTEMPTS_PER_DAY);
  assert.equal(state.completed_at,null,'an unproductive day stays open until the budget is gone');
  const requestCount=hits.length;
- assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T19:00:00Z')})).reason,'budget');
+ assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T23:30:00Z')})).reason,'budget');
  assert.equal(hits.length,requestCount,'a spent budget issues no request');
  // The budget is a UTC-day budget: the next UTC day opens a fresh one.
- const nextDay=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-08T01:00:00Z')}));
+ const nextDay=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-08T05:30:00Z')}));
  assert.equal(nextDay.newContentCount,0);
  assert.equal((await day('2026-10-08')).attempts,1);
 });
@@ -98,20 +98,20 @@ test('a retry re-reads the cached feed so an announcement published later that d
   if(ids.length) return new Response(atomFor(ids.map(id=>({id}))));
   return new Response(atomFor([]));
  };
- const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  assert.equal(first.newContentCount,0);
  assert.equal(rssFetches,1);
  assert.equal((await day('2026-10-07')).last_outcome,'empty');
  // arXiv publishes again later that day: the cached (empty) feed must not be replayed.
  feed=rssFor(['2610.08101v1']);
- const retry=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T07:00:00Z')}));
+ const retry=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T11:30:00Z')}));
  assert.equal(rssFetches,2,'the retry re-reads the official feed instead of replaying the cached one');
  assert.ok(retry.newContentCount>0,'the later announcement is collected');
  assert.equal(retry.hydrationIngested,1);
  const state=await day('2026-10-07');
  assert.equal(state.attempts,2);
  assert.equal(state.last_outcome,'collected');
- assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T13:00:00Z')})).reason,'completed');
+ assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T17:30:00Z')})).reason,'completed');
  assert.equal(rssFetches,2);
 });
 
@@ -119,18 +119,18 @@ test('a failed attempt leaves the day open for the retry and the retry still run
  await clean();
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const down:typeof fetch=async()=>{throw new Error('feed down');};
- await assert.rejects(collectScheduledArxiv({fetch:down,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ await assert.rejects(collectScheduledArxiv({fetch:down,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  let state=await day('2026-10-07');
  assert.equal(state.attempts,1);
  assert.equal(state.last_outcome,'failed');
  assert.equal(state.completed_at,null,'a failure never closes the day');
  // A few seconds after the failure — a pg-boss internal retry, a re-delivery or a restart — must not
  // run the collection again: the day is open, but only the next due tick may spend an attempt.
- const tooSoon=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T01:00:06Z')}));
+ const tooSoon=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T05:30:06Z')}));
  assert.equal(tooSoon.reason,'not_due','a re-delivery seconds after the failure is refused');
- assert.equal(tooSoon.nextEligibleAt,'2026-10-07T07:00:00.000Z');
+ assert.equal(tooSoon.nextEligibleAt,'2026-10-07T11:30:00.000Z');
  assert.equal((await day('2026-10-07')).attempts,1,'a refused re-delivery spends no attempt');
- const retry=ran(await collectScheduledArxiv({fetch:serving(()=>rssFor(['2610.09001v1'])),sleep:async()=>{},now:at('2026-10-07T07:00:00Z')}));
+ const retry=ran(await collectScheduledArxiv({fetch:serving(()=>rssFor(['2610.09001v1'])),sleep:async()=>{},now:at('2026-10-07T11:30:00Z')}));
  assert.ok(retry.newContentCount>0);
  state=await day('2026-10-07');
  assert.equal(state.attempts,2);
@@ -146,7 +146,7 @@ test('a tick blocked by the durable 429 hold does not spend an attempt of the da
  // is about the generic gate, not about how long a 429 holds for; that is asserted where the 429 is
  // really raised (arxiv-collection-cooldown / arxiv-hydration-cache-throttle).
  await sql`INSERT INTO arxiv_collection_state(key,owner,lease_until) VALUES('astro-ph',NULL,clock_timestamp()+interval '2 hours')`;
- const blocked=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ const blocked=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  assert.equal(blocked.status,'skipped','the durable hold blocks the run before it touches the network');
  assert.equal(blocked.reason,'rate_limited','a frozen tick is reported as rate limited, not as a run');
  assert.equal((await day('2026-10-07')).attempts,0,'an attempt that never ran is given back');
@@ -156,9 +156,9 @@ test('a real 429 freezes the rest of the UTC day for the whole six hours',async(
  await clean();
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const limited:typeof fetch=async()=>new Response('rate limited',{status:429});
- // The 01:00 tick really runs and really gets a 429, so that attempt is spent: the hold is established
+ // The 05:30 tick really runs and really gets a 429, so that attempt is spent: the hold is established
  // from the moment the 429 was handled, not from a nominal hour.
- await assert.rejects(collectScheduledArxiv({fetch:limited,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}),/HTTP 429/);
+ await assert.rejects(collectScheduledArxiv({fetch:limited,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}),/HTTP 429/);
  assert.equal((await day('2026-10-07')).attempts,1);
  const held=(await sql<{owner:string|null;lease_until:Date;db_now:Date}[]>`
   SELECT owner,lease_until,clock_timestamp() AS db_now FROM arxiv_collection_state WHERE key='astro-ph'`)[0]!;
@@ -181,23 +181,23 @@ test('one due instant admits once, and the next attempt waits the whole six hour
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const hits:string[]=[];
  const empty=serving(()=>rssFor([]),hits);
- const first=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ const first=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  assert.equal(first.newContentCount,0);
  assert.equal((await day('2026-10-07')).attempts,1);
  const issued=hits.length;
  assert.ok(issued>0,'the admitted tick really ran');
  // A duplicate delivery, a restart re-delivery and the queue's own retry all land in the same tick.
- const duplicate=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T01:00:05Z')}));
+ const duplicate=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T05:30:05Z')}));
  assert.equal(duplicate.reason,'not_due','the tick is already spent');
- assert.equal(duplicate.nextEligibleAt,'2026-10-07T07:00:00.000Z','the next eligible moment is the next tick');
+ assert.equal(duplicate.nextEligibleAt,'2026-10-07T11:30:00.000Z','the next eligible moment is the next tick');
  assert.equal(hits.length,issued,'a rejected tick touches no network');
  assert.equal((await day('2026-10-07')).attempts,1,'a rejected tick spends no attempt');
  // Even one second before the interval is up the call is refused, network untouched.
- assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T06:59:59Z')})).reason,'not_due');
+ assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T11:29:59Z')})).reason,'not_due');
  assert.equal(hits.length,issued);
  assert.equal((await day('2026-10-07')).attempts,1);
  // Exactly one interval later the next scheduled tick is admitted.
- const retry=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T07:00:00Z')}));
+ const retry=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T11:30:00Z')}));
  assert.equal(retry.newContentCount,0);
  assert.equal((await day('2026-10-07')).attempts,2);
 });
@@ -208,8 +208,8 @@ test('two concurrent deliveries of one tick cannot both start a collection',asyn
  const hits:string[]=[];
  const empty=serving(()=>rssFor([]),hits);
  const results=await Promise.all([
-  collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}),
-  collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}),
+  collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}),
+  collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}),
  ]);
  const running=results.filter((value):value is CollectRun=>value!==undefined&&!isScheduledSkip(value));
  const rejected=results.filter((value):value is ScheduledCollectionSkip=>value!==undefined&&isScheduledSkip(value));
@@ -235,7 +235,7 @@ test('a partial hydration round closes the day once it stored what it could',asy
  };
  // The supplement's own batch size is the knob that splits the gap list (RSS-U3); pageSize stays 1 so
  // the legacy window page below is also one paper wide.
- const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T01:00:00Z'),pageSize:1,supplementBatchIds:1}));
+ const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T05:30:00Z'),pageSize:1,supplementBatchIds:1}));
  assert.equal(first.partial,true,'the versions that could not be stored are reported, not raised');
  assert.equal(first.complete,false,'a partial round never claims the window was handled');
  assert.equal(first.hydrationIngested,1,'the version that did come back is really counted');
@@ -267,7 +267,7 @@ test('a round that stored none of its requested versions keeps the day open for 
   if(ids.length) asked.push(ids);
   return new Response(atomFor([]));
  };
- const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  assert.equal(first.partial,true);
  assert.equal(first.hydrationIngested,0);
  assert.deepEqual(asked,[['2610.06301v1']]);
@@ -277,7 +277,7 @@ test('a round that stored none of its requested versions keeps the day open for 
  assert.equal(state.attempts,1);
  // The retry is a clean run: the open exception is not asked for again, so the round simply finds
  // nothing and the day stays open until its budget is spent.
- const retry=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T07:00:00Z')}));
+ const retry=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T11:30:00Z')}));
  assert.equal(retry.partial,false,'a version already recorded as an open exception is never re-requested');
  assert.deepEqual(asked,[['2610.06301v1']],'the retry asks for nothing it already recorded');
  assert.equal((await day('2026-10-07')).attempts,2);
@@ -288,24 +288,24 @@ test('a tick that ran hours late starts its six hours when it really ran',async(
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const hits:string[]=[];
  const empty=serving(()=>rssFor([]),hits);
- // The morning tick is polled late: the job starts at 08:05 instead of 01:00, so the day's first
- // attempt really runs at 08:05 and owns 14:05 as its earliest retry.
- const late=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T08:05:00Z')}));
+ // The morning tick is polled late: the job starts at 12:35 instead of 05:30, so the day's first
+ // attempt really runs at 12:35 and owns 18:35 as its earliest retry.
+ const late=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T12:35:00Z')}));
  assert.equal(late.newContentCount,0);
  assert.equal((await day('2026-10-07')).attempts,1);
  const issued=hits.length;
  assert.ok(issued>0,'the late tick really ran');
- // 13:00 is only 4 h 55 m after the attempt really ran. A late run is not rounded back to a nominal
+ // 17:30 is only 4 h 55 m after the attempt really ran. A late run is not rounded back to a nominal
  // hour, so the whole six hours are measured on the real admission: no minute is given away.
- const tooSoon=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T13:00:00Z')}));
+ const tooSoon=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T17:30:00Z')}));
  assert.equal(tooSoon.reason,'not_due','the six hours are measured on the admission, not on a nominal hour');
- assert.equal(tooSoon.nextEligibleAt,'2026-10-07T14:05:00.000Z','exactly six hours after the real admission, not one minute less');
+ assert.equal(tooSoon.nextEligibleAt,'2026-10-07T18:35:00.000Z','exactly six hours after the real admission, not one minute less');
  assert.equal(hits.length,issued,'the refused tick touches no network');
  assert.equal((await day('2026-10-07')).attempts,1,'the refused tick spends no attempt');
  // The boundary is the real instant plus the full interval, to the second.
- assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T14:04:59Z')})).reason,'not_due');
+ assert.equal(skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T18:34:59Z')})).reason,'not_due');
  assert.equal(hits.length,issued);
- const next=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T14:05:00Z')}));
+ const next=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T18:35:00Z')}));
  assert.equal(next.newContentCount,0);
  assert.equal((await day('2026-10-07')).attempts,2);
 });
@@ -315,42 +315,42 @@ test('the six-hour bound is strict: a punctual tick is not given back the time i
  Object.assign(process.env,{COLLECT_ENABLED:'true',ARXIV_NATIVE_COLLECT_ENABLED:'true'});
  const hits:string[]=[];
  const empty=serving(()=>rssFor([]),hits);
- // A job always starts a little after its hour: 400 ms into 01:00 and 100 ms into 07:00. Six whole
- // hours have NOT passed between the two admissions, so the 07:00 tick is refused. The interval may be
+ // A job always starts a little after its hour: 400 ms into 05:30 and 100 ms into 11:30. Six whole
+ // hours have NOT passed between the two admissions, so the 11:30 tick is refused. The interval may be
  // longer than six hours, never shorter, and the sub-second lateness of a punctual run is not
  // subtracted from it.
- ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T01:00:00.400Z')}));
+ ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T05:30:00.400Z')}));
  const issued=hits.length;
- const tooSoon=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T07:00:00.100Z')}));
+ const tooSoon=skipped(await collectScheduledArxiv({fetch:forbidden,sleep:async()=>{},now:at('2026-10-07T11:30:00.100Z')}));
  assert.equal(tooSoon.reason,'not_due','the interval is measured on the real instants, with no jitter allowance');
- assert.equal(tooSoon.nextEligibleAt,'2026-10-07T07:00:00.400Z','the earliest admission is the real instant plus the whole interval');
+ assert.equal(tooSoon.nextEligibleAt,'2026-10-07T11:30:00.400Z','the earliest admission is the real instant plus the whole interval');
  assert.equal(hits.length,issued,'the refused tick touches no network');
  assert.equal((await day('2026-10-07')).attempts,1,'a refused tick spends no attempt');
- const admitted=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T07:00:00.400Z')}));
+ const admitted=ran(await collectScheduledArxiv({fetch:empty,sleep:async()=>{},now:at('2026-10-07T11:30:00.400Z')}));
  assert.equal(admitted.newContentCount,0);
  assert.equal((await day('2026-10-07')).attempts,2,'exactly six hours after the real admission the next tick runs');
 });
 
-test('a minute of lateness is lateness: 01:01 owns 07:01, and the bound is strict to the millisecond',async()=>{
+test('a minute of lateness is lateness: 05:31 owns 11:31, and the bound is strict to the millisecond',async()=>{
  await clean();
  // Driven straight at the admission so the boundary is exact.
- const late=await begin(new Date('2026-10-06T01:01:00Z'));
+ const late=await begin(new Date('2026-10-06T05:31:00Z'));
  assert.equal(late.allowed,true);
- assert.equal(late.nextDueAt,'2026-10-06T07:01:00.000Z','the six hours start when the attempt really ran');
+ assert.equal(late.nextDueAt,'2026-10-06T11:31:00.000Z','the six hours start when the attempt really ran');
  await releaseLease();
- const refused=await begin(new Date('2026-10-06T07:00:00Z'));
+ const refused=await begin(new Date('2026-10-06T11:30:00Z'));
  assert.equal(refused.allowed,false,'one minute past the anchor is already late');
  assert.equal(refused.reason,'not_due');
- assert.equal(refused.nextDueAt,'2026-10-06T07:01:00.000Z');
+ assert.equal(refused.nextDueAt,'2026-10-06T11:31:00.000Z');
  assert.equal((await day('2026-10-06')).attempts,1,'a refused tick spends no attempt');
- const aMillisecondEarly=await begin(new Date('2026-10-06T07:00:59.999Z'));
+ const aMillisecondEarly=await begin(new Date('2026-10-06T11:30:59.999Z'));
  assert.equal(aMillisecondEarly.allowed,false,'the bound is strict one millisecond short as well');
- assert.equal(aMillisecondEarly.nextDueAt,'2026-10-06T07:01:00.000Z');
- const exactly=await begin(new Date('2026-10-06T07:01:00.000Z'));
+ assert.equal(aMillisecondEarly.nextDueAt,'2026-10-06T11:31:00.000Z');
+ const exactly=await begin(new Date('2026-10-06T11:31:00.000Z'));
  assert.equal(exactly.allowed,true,'exactly six hours passes the time gate');
  assert.equal(exactly.attempt,2);
  await releaseLease();
- const beyond=await begin(new Date('2026-10-06T14:30:00Z'));
+ const beyond=await begin(new Date('2026-10-06T19:00:00Z'));
  assert.equal(beyond.allowed,true,'a longer interval is never refused by the time gate');
  assert.equal(beyond.attempt,3);
 });
@@ -362,7 +362,7 @@ test('the durable due instant still spaces a very late attempt across the UTC da
  const late=await begin(new Date('2026-10-07T23:30:00Z'));
  assert.equal(late.allowed,true);
  assert.equal(late.nextDueAt,'2026-10-08T05:30:00.000Z');
- const nextDay=await begin(new Date('2026-10-08T01:00:00Z'));
+ const nextDay=await begin(new Date('2026-10-08T05:29:00Z'));
  assert.equal(nextDay.allowed,false,'a very late attempt still spaces the next day first attempt');
  assert.equal(nextDay.reason,'not_due');
  assert.equal(nextDay.nextDueAt,'2026-10-08T05:30:00.000Z','six hours after 23:30 really ran, with no rounding for a late run');
@@ -382,7 +382,7 @@ test('a partial round closes the day when the independent window stored real pap
   // ...while the independent API window really does store an ordinary paper.
   return new Response(atomFor([{id:'2610.06501v1'}]));
  };
- const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T01:00:00Z')}));
+ const first=ran(await collectScheduledArxiv({fetch:fake,sleep:async()=>{},now:at('2026-10-07T05:30:00Z')}));
  assert.equal(first.partial,true,'the absent version is a structured partial result, not a failed round');
  assert.equal(first.hydrationIngested,0,'no requested version could be stored');
  assert.equal(first.windowIngested,1,'the independent window stored an ordinary paper');
