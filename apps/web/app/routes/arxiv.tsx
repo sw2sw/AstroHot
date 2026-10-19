@@ -25,24 +25,32 @@ function categoryLabel(code: string): string {
   const label = CATEGORY_LABELS[code];
   return label ? `${label}（${code}）` : code;
 }
-/**
- * The day this record is grouped and headed under. The announcement day is preferred whenever the
- * source stated one; otherwise the API submission day. When NEITHER exists — a record read out of the
- * official RSS announcement feed, which states no submission instant at all — the day is reported as
- * unknown. It is never rendered as `new Date(null)`, which would print 1970-01-01 as if it were data.
- */
+/** Reject missing/invalid source dates before constructing a Date (null would become 1970). */
+function utcDay(value: string | null | undefined): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(value)) return null;
+  const calendarDay = value.slice(0, 10);
+  const midnight = new Date(`${calendarDay}T00:00:00Z`);
+  if (!Number.isFinite(midnight.getTime()) || midnight.toISOString().slice(0, 10) !== calendarDay) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : null;
+}
+function announcementDay(paper: ArxivFeed["items"][number]): string | null {
+  return paper.announced_on?.length === 10 ? utcDay(paper.announced_on) : null;
+}
 function sourceDay(paper: ArxivFeed["items"][number]): string {
-  if (paper.announced_on) return paper.announced_on;
-  if (paper.submitted_at) return new Date(paper.submitted_at).toISOString().slice(0, 10);
-  return "日期未知";
+  return announcementDay(paper) ?? utcDay(paper.submitted_at) ?? "日期未知";
+}
+function sourceKind(paper: ArxivFeed["items"][number]): string {
+  return announcementDay(paper) ? "公告" : utcDay(paper.submitted_at) ? "提交（UTC）" : "来源未提供日期";
 }
 function dayGroup(paper: ArxivFeed["items"][number]): string {
-  const kind = paper.announced_on ? "announced" : paper.submitted_at ? "submitted" : "unknown";
-  return `${sourceDay(paper)}|${kind}`;
+  return `${sourceDay(paper)}|${sourceKind(paper)}`;
 }
-/** The same two instants, as a label/value pair, so a missing one reads as "unknown" not as 1970. */
-function instantLabel(value: string | null | undefined): string {
-  return value ? new Date(value).toISOString().slice(0, 10) : "未知";
+function PaperDates({ paper }: { paper: ArxivFeed["items"][number] }) {
+  const submitted = utcDay(paper.submitted_at);
+  const updated = utcDay(paper.updated_at);
+  if (!submitted && !updated) return null;
+  return <p className="mt-1 text-xs text-ink-4">提交（UTC）：{submitted ? <time dateTime={paper.submitted_at!}>{submitted}</time> : "未知"} · 更新（UTC）：{updated ? <time dateTime={paper.updated_at!}>{updated}</time> : "未知"}</p>;
 }
 const STUDIES = { observation: "观测", simulation: "模拟", theory: "理论", method: "方法", mixed: "混合研究" };
 
@@ -217,13 +225,13 @@ export function ArxivPageContent({ feed, category }: { feed: ArxivFeed; category
     </nav>
     {view.items.length === 0 && <p className="card p-6 text-ink-3">{!view.latestBatch ? "尚未同步报告，候选档案暂无数据。" : view.total > 0 || view.page > 1 ? "此页暂无候选，请返回上一页。" : category ? "该方向暂无候选，请尝试其他方向或全部方向。" : "候选档案暂无精选候选。"}</p>}
     <ul aria-labelledby="candidate-archive" className="space-y-4">{view.items.map((paper, index) => <li key={paper.paper_key}>
-      {(index === 0 || dayGroup(paper) !== dayGroup(view.items[index - 1]!)) && <h3 className="mb-3 text-base font-semibold text-ink">{sourceDay(paper)}<span className="ml-2 text-xs font-normal text-ink-4">{paper.announced_on ? "公告" : paper.submitted_at ? "提交（UTC）" : "来源未提供日期"}</span></h3>}
+      {(index === 0 || dayGroup(paper) !== dayGroup(view.items[index - 1]!)) && <h3 className="mb-3 text-base font-semibold text-ink">{sourceDay(paper)}<span className="ml-2 text-xs font-normal text-ink-4">{sourceKind(paper)}</span></h3>}
       <div className="card p-5">
       <h4 className="text-lg font-semibold text-ink"><MathText text={paper.title_zh} /></h4>
       <p lang="en" className="mt-1 text-sm text-ink-3"><MathText text={paper.title_original} /></p>
       <p className="mt-3 whitespace-pre-line leading-relaxed text-ink"><MathText text={paper.summary_zh} /></p>
       <p className="mt-3 text-sm text-ink-3">{STUDIES[paper.study_type]} · {paper.categories.map(categoryLabel).join(" / ")} · {paper.arxiv_id}</p>
-      <p className="mt-1 text-xs text-ink-4">{paper.announced_on ? <>公告日：<time dateTime={paper.announced_on}>{paper.announced_on}</time> · </> : null}提交（UTC）：{paper.submitted_at ? <time dateTime={paper.submitted_at}>{instantLabel(paper.submitted_at)}</time> : <span>未知（来源为 arXiv 官方公告源，未提供提交时间）</span>} · 更新（UTC）：{paper.updated_at ? <time dateTime={paper.updated_at}>{instantLabel(paper.updated_at)}</time> : <span>未知</span>}</p>
+      <PaperDates paper={paper} />
       <a className="mt-3 inline-block text-sm font-medium text-accent" href={paper.url} target="_blank" rel="noopener noreferrer">阅读 arXiv 原文 ↗</a>
       </div>
     </li>)}</ul>
