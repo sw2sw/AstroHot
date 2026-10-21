@@ -76,9 +76,24 @@ test("URL is the exact HTTPS arxiv abs versioned ID without credentials or suffi
   for (const url of [null, "http://arxiv.org/abs/2612.99999v1", "https://evil.test/abs/2612.99999v1", "https://arxiv.org@evil.test/abs/2612.99999v1", "https://user:pass@arxiv.org/abs/2612.99999v1", "https://arxiv.org/abs/2612.99999v1?x=1", "https://arxiv.org/abs/2612.99999v1#x", "https://arxiv.org/abs/2612.99999", "https://arxiv.org:443/abs/2612.99999v1", "https://arxiv.org/abs/2612.99999v2", "https://arxiv.org/abs/2612.99999v1/"]) rejects(r => r.items[0].url = url, /url/);
 });
 
+test("preserves a long unparsed collaboration author block without truncating or comma splitting", () => {
+  const r = fresh();
+  const original = "Euclid Collaboration, Author (Institute, City), ".padEnd(48306, "x");
+  r.items[0].authors = [original];
+  assert.deepEqual(validateArxivReport(r).items[0].authors, [original]);
+});
+
+test("bounds total author text per paper while allowing the exact boundary", () => {
+  const r = fresh();
+  r.items[0].authors = ["x".repeat(50_000), "y".repeat(50_000)];
+  assert.deepEqual(validateArxivReport(r).items[0].authors, r.items[0].authors);
+  r.items[0].authors.push("z");
+  assert.throws(() => validateArxivReport(r), /authors/);
+});
+
 test("categories contain an astronomy subtype and authors are bounded string arrays", () => {
   for (const value of [null, {}, "astro-ph.GA", [], [""], [" "], [1], ["astro-ph"], ["hep-th"], ["astro-ph.XX"], ["astro-ph.GA", null], ["astro-ph.GA", "x".repeat(129)]]) rejects(r => r.items[0].categories = value, /categories/);
-  for (const value of [null, {}, "author", [null], [1], [" "], ["x".repeat(501)]]) rejects(r => r.items[0].authors = value, /authors/);
+  for (const value of [null, {}, "author", [null], [1], [" "], ["x".repeat(100_001)]]) rejects(r => r.items[0].authors = value, /authors/);
   const r = fresh(); r.items[0].authors = []; assert.equal(validateArxivReport(r).items[0].authors.length, 0);
   for (const subtype of ["GA", "CO", "EP", "HE", "SR", "IM"]) {
     const r = fresh(); r.items[0].categories = ["astro-ph." + subtype]; assert.deepEqual(validateArxivReport(r).items[0].categories, r.items[0].categories);
