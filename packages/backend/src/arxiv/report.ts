@@ -190,7 +190,12 @@ export function validateArxivReport(input: unknown): ArxivReport {
   });
   r.items.forEach((p, i) => {
     const path = `items[${i}]`;
-    strings(p.authors, 500, `${path}.authors`);
+    // Official RSS may retain a whole collaboration/affiliation block as one unparsed entry.
+    // Preserve that evidence verbatim rather than imposing a short personal-name limit.
+    strings(p.authors, 100_000, `${path}.authors`);
+    if (p.authors.reduce((total, author) => total + author.length, 0) > 100_000) {
+      fail(`${path}.authors`, "at most 100000 total characters per paper");
+    }
     strings(p.categories, 128, `${path}.categories`);
     if (!p.categories.some(c => ["astro-ph.GA", "astro-ph.CO", "astro-ph.EP", "astro-ph.HE", "astro-ph.SR", "astro-ph.IM"].includes(c))) {
       fail(`${path}.categories`, "requires at least one of the six astro-ph subtypes");

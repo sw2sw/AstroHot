@@ -139,6 +139,29 @@ test('an RSS new paper with no submission instant is admitted, analyzed once and
   } finally { await model.server.close(); }
 });
 
+test('a long unparsed collaboration author block survives analysis and is never paid twice', async () => {
+  await clean();
+  await setStartOn('2026-09-01');
+  const model = await withModel();
+  try {
+    const authors = 'Euclid Collaboration, Author (Institute,City), '.padEnd(48_306, 'x');
+    const rawRss = rssFeed([{ id: '2610.09002v1' }]).replace('Alice Author, Bob Builder', authors);
+    await sql.begin(async (tx) => {
+      const ambient = { begin: async <T>(fn: (tx: Tx) => Promise<T>): Promise<T> => fn(tx) };
+      const stored = await ingestArxivAnnouncements(rawRss, '2026-10-07T12:00:00Z', ambient);
+      assert.equal(stored.status, 'imported');
+      if (stored.status === 'imported') await persistRssArxivBatch(tx, rawRss, stored.batchHash, '2026-10-07T12:00:00Z');
+    });
+    const first = await model.api.analyzePendingArxiv({ limit: 1, model: 'default' });
+    assert.equal(first.analyzed, 1, JSON.stringify(first));
+    const [paper] = await sql<{ paper: { authors: string[] } }[]>`SELECT paper FROM arxiv_papers WHERE base_id='2610.09002'`;
+    assert.deepEqual(paper!.paper.authors, [authors]);
+    assert.equal((await sql`SELECT count(*)::int n FROM receipts WHERE status='completed'`)[0]!.n, 1);
+    assert.equal((await model.api.analyzePendingArxiv({ limit: 1, model: 'default' })).analyzed, 0);
+    assert.equal(model.server.hits(), 1);
+  } finally { await model.server.close(); }
+});
+
 test('an RSS announcement older than the analysis floor is not widened into the analysis', async () => {
   await clean();
   await setStartOn('2026-10-01');
