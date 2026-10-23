@@ -97,6 +97,8 @@ Configure automatic startup after a restart, logging, environment loading, and g
 
 ## 5. Configuration and Enablement
 
+See [observing-guide configuration and use](OBSERVING-GUIDES.en.md) for activation, sources, curation, ordering, and stale-build checks. Automatic inclusion is off by default; enabling collection or editing curated IDs does not enable it.
+
 After basic startup passes, select sources and configure budgets and models according to the [administration settings](ADMIN.en.md), validate with small batches, and only then enable scheduling. Do not confuse initialization seeds, administration database settings, and live environment variables. See [operating cadence](CADENCE.en.md) for article cadence and model recovery pacing.
 
 Model throughput is bounded by concurrency caps, request spacing and provider quotas together, so configure conservatively against your actual service limits; multiple instances share one quota. Backlog behavior under low concurrency or slow responses, `no model slot free within ...ms`, 429s, quarantined tokens and diagnostic boundaries are described in [Model Capacity and Processing Backlogs](../KNOWN-ISSUES.en.md#model-capacity-and-processing-backlogs); that section documents limits and TODOs, not implemented fixes.

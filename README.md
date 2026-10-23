@@ -47,6 +47,7 @@ cp .env.example .env
 
 - 部署与管理：[部署、升级和备份](docs/DEPLOYMENT.md) · [后台设置](docs/ADMIN.md) · [错误记录](docs/ERROR-RECORDING.md)
 - 来源与筛选：[来源配置](docs/SOURCES.md) · [采集与分析频度](docs/CADENCE.md) · [评分方法](docs/SCORING.md)
+- 观测实用：[观测指南设置与使用](docs/OBSERVING-GUIDES.md)
 - 内容与演示：[诺贝尔奖专题](docs/NOBEL.md) · [合成演示数据](database/demo/README.md) · [内容版权核查](docs/CONTENT-RIGHTS.md)
 - 项目状态：[已知问题](KNOWN-ISSUES.md) · [开发 TODO](docs/TODO.md) · [验证范围](docs/VALIDATION.md)
 
