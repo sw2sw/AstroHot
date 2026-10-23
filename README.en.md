@@ -47,6 +47,7 @@ Follow the [deployment guide](docs/DEPLOYMENT.en.md) to configure a separate dat
 
 - Deployment and administration: [deployment, upgrades, and backups](docs/DEPLOYMENT.en.md) · [administration](docs/ADMIN.en.md) · [error recording](docs/ERROR-RECORDING.en.md)
 - Sources and screening: [source configuration](docs/SOURCES.en.md) · [collection and analysis cadence](docs/CADENCE.en.md) · [scoring](docs/SCORING.en.md)
+- Observing: [guide configuration and use](docs/OBSERVING-GUIDES.en.md)
 - Content and demos: [Nobel Prize topic](docs/NOBEL.en.md) · [synthetic demo data](database/demo/README.en.md) · [content-rights review](docs/CONTENT-RIGHTS.en.md)
 - Project status: [known issues](KNOWN-ISSUES.en.md) · [development TODO](docs/TODO.en.md) · [validation scope](docs/VALIDATION.en.md)
 
