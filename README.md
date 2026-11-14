@@ -23,13 +23,13 @@ AstroHot 汇集天文新闻与论文元数据，保留来源和原文入口，�
 
 ## Agent Skill：公开天文资讯查询
 
-实验路线提供 [`astronomy-sources` Skill说明](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md)，便于Agent查询公开资讯与精选，按关键词、分类、来源、原文发布日期或收录日期查找，并返回来源、已有导语和原文链接。来源与具体日期的筛选方式见Skill说明；公开接口覆盖近七天。
+将这个地址交给自己的Agent即可：**[astronomy-sources / SKILL.md](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md)**。
 
-- 公开读取无需登录或API Key；这是资讯查询入口，不是模型推理接口，阅读不触发采集或模型生成。
-- 导语可能为空，标题可能保留原语言；不要把原文发布日期、本站收录时间和筛选完成时间混为一谈。
-- [接口与查询说明](https://ucas.sitianai.com/static/skills/astronomy-sources/llms.txt) · [公开API示例](https://ucas.sitianai.com/astrohot/api/v1/items?mode=all&window=7d&limit=5)。
+可以直接对Agent说：
 
-以上链接指向已发布的在线服务。克隆仓库不会自动部署该服务、获得其内容或安装Skill；自行部署时应使用自己的公开地址。外部Skill使用前仍须自行审查，重要信息回原文核对。
+> 请先审查这个Skill，再按其说明获取所需文件并安装，查询最近一周的天文资讯，附来源与原文链接。
+
+无需克隆或部署AstroHot。Skill及完整包由原站提供，不在本GitHub仓库分发；公开查询无需登录或API Key，读取已有资讯不触发采集或模型生成。
 
 ## 功能
 

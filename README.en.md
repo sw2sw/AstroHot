@@ -19,13 +19,13 @@ AstroHot collects astronomy news and paper metadata, retains sources and origina
 
 ## Agent Skill: public astronomy information queries
 
-The experimental route links to the published [`astronomy-sources` Skill](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md). Agents can query public news and selected items by keyword, category, source, original publication date, or collection date, with source introductions and original links. See the Skill for source/date filtering; the public API covers the last seven days.
+Give your own agent this address: **[astronomy-sources / SKILL.md](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md)**.
 
-Public reads require no login or API key and do not trigger collection or model generation. This is a content-query interface, not an inference API. Introductions may be absent and titles may retain their original language. Keep original publication, collection, and screening times distinct.
+For example:
 
-[Query reference](https://ucas.sitianai.com/static/skills/astronomy-sources/llms.txt) · [Public API example](https://ucas.sitianai.com/astrohot/api/v1/items?mode=all&window=7d&limit=5).
+> Review this Skill first, then obtain its required files and install it as documented. Find astronomy news from the last week and include sources and original links.
 
-These links refer to a separately published online service. Cloning this repository does not deploy that service, include its operational content, or install the Skill. Self-hosted deployments should use their own public address. Review external Skill instructions before use and verify important claims against the original sources.
+There is no need to clone or deploy AstroHot. The Skill and its full package are hosted by the linked service, not distributed in this GitHub repository. Public queries require no login or API key; reading existing content does not trigger collection or model generation.
 
 ## Features
 
