@@ -8,6 +8,15 @@ AstroHot collects astronomy news and paper metadata, retains sources and origina
 
 > The project is still evolving: type checking and some backend tests have known gaps. Before deploying, read the [deployment guide](docs/DEPLOYMENT.en.md), [known issues](KNOWN-ISSUES.en.md), and [validation scope](docs/VALIDATION.en.md). AI screening is not full-text reading, peer review, or scientific fact verification.
 
+## Choosing a branch
+
+| Branch | Purpose and scope | Status |
+| --- | --- | --- |
+| [`main`](https://github.com/sw2sw/AstroHot/tree/main) | Comprehensive astronomy information and reading platform: news, initial paper screening, bilingual reading, reports, imagery, and special topics. | Main maintenance line for the comprehensive website. Deployment still requires validation; this branch is not a guarantee of parity with a live instance. |
+| [`experiment/editorial-cost-reduction`](https://github.com/sw2sw/AstroHot/tree/experiment/editorial-cost-reduction) | Lightweight astronomy information aggregation: combines PRs #8 and #9, with source-noise filtering, batched title screening, source introductions, original links, and an external Agent Skill entry point. | Experimental, with unresolved issues and no completed production acceptance. Not a drop-in upgrade for the comprehensive website. |
+
+Choose `main` for the comprehensive website. To explore lightweight aggregation, read the experimental branch's [differences and usage boundaries](https://github.com/sw2sw/AstroHot/blob/experiment/editorial-cost-reduction/docs/EXPERIMENTAL-EDITORIAL-AGGREGATION.md) (Chinese). For convenient astronomy queries only, give your own agent the [Skill instructions URL](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md) to review and install. No AstroHot clone or deployment is needed; the full package is hosted by the linked service, not distributed in this repository.
+
 ## Features
 
 - **News and selected items**: configurable sources, screening, event grouping, and deduplication, with original links, dates, and attribution.

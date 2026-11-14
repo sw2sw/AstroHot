@@ -8,6 +8,15 @@ AstroHot 汇集天文新闻与论文元数据，保留来源和原文入口，�
 
 > 项目仍在完善：类型检查和部分后端测试有已知缺口。开始使用前请查看[部署指南](docs/DEPLOYMENT.md)、[已知问题](KNOWN-ISSUES.md)及[验证范围](docs/VALIDATION.md)。AI 初筛不等于阅读全文、同行评议或科学事实核验。
 
+## 分支选择
+
+| 分支 | 定位与适用范围 | 使用状态 |
+| --- | --- | --- |
+| [`main`](https://github.com/sw2sw/AstroHot/tree/main) | 综合天文资讯与阅读平台，涵盖资讯、论文初筛、双语阅读、刊报、影像与专题。 | 综合网站维护主线；部署前仍需按部署指南和验证范围验收，不代表与线上实例完全一致。 |
+| [`experiment/editorial-cost-reduction`](https://github.com/sw2sw/AstroHot/tree/experiment/editorial-cost-reduction) | 轻量天文信息汇总：整合PR #8、#9，采用来源降噪、标题合批筛选、来源导语和原文导流，并提供外部Agent Skill入口。 | 实验路线，尚有待修问题，未完成生产验收；不是综合网站的直接升级替代。 |
+
+需要综合网站功能时选择 `main`；需要研究轻量汇总路线时查看实验分支的[差异与使用边界](https://github.com/sw2sw/AstroHot/blob/experiment/editorial-cost-reduction/docs/EXPERIMENTAL-EDITORIAL-AGGREGATION.md)。仅希望便捷查询天文资讯，可将[Skill说明地址](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md)交给自己的Agent审查并安装，无需克隆或部署AstroHot；完整包由原站提供，不在本仓库分发。
+
 ## 功能
 
 - **资讯与精选**：可配置来源、筛选、事件归组和去重，保留原始链接、日期与署名。
