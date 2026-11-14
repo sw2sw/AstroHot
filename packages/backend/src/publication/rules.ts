@@ -15,14 +15,15 @@ export function channelOf(sourceKind: string, hasXPost: boolean): "x" | "news" {
   return sourceKind === "x_search" || hasXPost ? "x" : "news";
 }
 
-/** Public pool (/all): editorial sources, AI relevant, with a Chinese title and summary. */
+/** The title batch can admit a relevant headline even when the source has no introduction. */
 export function isPoolEligible(input: {
   participationMode: string;
   relevance: string | null;
   title: string | null;
   summary: string | null;
+  titleBatch?: boolean;
 }): boolean {
-  return input.participationMode === "editorial" && input.relevance === "pass" && !!input.title && !!input.summary;
+  return input.participationMode === "editorial" && input.relevance === "pass" && !!input.title && (!!input.summary || input.titleBatch === true);
 }
 
 /**

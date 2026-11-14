@@ -9,6 +9,7 @@ test('analysis checks each minute in its own exclusive queue without queue retri
   let source = await readFile(new URL('../apps/worker/src/schedules.ts', import.meta.url), 'utf8');
   source = source.replace(/^import .*;\n/gm, '').replace(/^export /gm, '');
   const context = vm.createContext({ process: { env: { ARXIV_ANALYSIS_ENABLED: 'true', MODEL_CALLS_ENABLED: 'true' } },
+    config: { titleBatchEnabled: false, modelCallsEnabled: true },
     imageryDailyEnabled: () => false, backupConfigured: () => false, FEATURES: {},
     sweepUnprocessed() {}, linkRelatedStories() {}, adaptIntervals() {},
   });
@@ -39,3 +40,56 @@ test('analysis checks each minute in its own exclusive queue without queue retri
   assert.deepEqual(removed, ['cron.arxiv.analyze']);
   assert.equal(await handlers.get(entry.queue)(), 'checked');
 });
+
+for (const titleBatchEnabled of [false, true]) {
+  for (const modelCallsEnabled of [false, true]) {
+    test(`news schedules respect titleBatchEnabled=${titleBatchEnabled} and modelCallsEnabled=${modelCallsEnabled}`, async () => {
+      let source = await readFile(new URL('../apps/worker/src/schedules.ts', import.meta.url), 'utf8');
+      source = source.replace(/^import .*;\n/gm, '').replace(/^export /gm, '');
+      let rounds = 0, usageReports = 0;
+      const context = vm.createContext({
+        process: { env: { ARXIV_ANALYSIS_ENABLED: 'true', MODEL_CALLS_ENABLED: String(modelCallsEnabled) } },
+        config: { titleBatchEnabled, modelCallsEnabled },
+        imageryDailyEnabled: () => false, backupConfigured: () => false, FEATURES: {},
+        sweepUnprocessed() {}, linkRelatedStories() {}, adaptIntervals() {},
+        enqueueTitleBatch: async () => { rounds += 1; },
+        recordNewsRoundUsage: async () => { usageReports += 1; },
+      });
+      vm.runInContext(stripTypeScriptTypes(source) + '\nglobalThis.schedules = SCHEDULES; globalThis.options = scheduleQueueOptions; globalThis.register = registerSchedules;', context);
+      const newsEnabled = titleBatchEnabled && modelCallsEnabled;
+      assert.equal(context.schedules.some((s: { name: string }) => s.name === 'content.news-round'), newsEnabled);
+      assert.equal(context.schedules.some((s: { name: string }) => s.name === 'content.news-usage'), newsEnabled);
+      const arxiv = context.schedules.find((s: { name: string }) => s.name === 'arxiv.analyze');
+      assert.equal(!!arxiv, modelCallsEnabled);
+      if (arxiv) {
+        assert.equal(arxiv.cron, '* * * * *');
+        assert.equal(arxiv.queue, 'cron.arxiv.analyze.continuous');
+        assert.equal(context.options(arxiv).policy, 'exclusive');
+        assert.equal(context.options(arxiv).retryLimit, 0);
+      }
+      const scheduled = new Map<string, { cron: string; tz: string }>();
+      const handlers = new Map<string, () => Promise<unknown>>();
+      const queueOptions = new Map<string, { retryLimit: number }>();
+      context.ensureQueue = async (name: string, options: { retryLimit: number }) => { queueOptions.set(name, options); };
+      context.recordRun = async (_name: string, fn: (id: number) => Promise<unknown>) => fn(1);
+      await context.register({
+        schedule: async (name: string, cron: string, _data: unknown, options: { tz: string }) => { scheduled.set(name, { cron, tz: options.tz }); },
+        work: async (name: string, _options: unknown, fn: () => Promise<unknown>) => { handlers.set(name, fn); },
+        getSchedules: async () => [],
+      });
+      const roundQueue = 'cron.content.news-round';
+      const usageQueue = 'cron.content.news-usage';
+      assert.equal(scheduled.has(roundQueue), newsEnabled);
+      assert.equal(scheduled.has(usageQueue), newsEnabled);
+      if (newsEnabled) {
+        assert.deepEqual(scheduled.get(roundQueue), { cron: '0 8,13,20 * * *', tz: 'Asia/Shanghai' });
+        assert.deepEqual(scheduled.get(usageQueue), { cron: '10 0 * * *', tz: 'Asia/Shanghai' });
+        assert.equal(queueOptions.get(roundQueue)?.retryLimit, 0);
+        await handlers.get(roundQueue)!();
+        await handlers.get(usageQueue)!();
+      }
+      assert.equal(rounds, newsEnabled ? 1 : 0);
+      assert.equal(usageReports, newsEnabled ? 1 : 0);
+    });
+  }
+}

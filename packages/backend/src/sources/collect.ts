@@ -1,6 +1,7 @@
 // Collection run for one source: fetch listing → filter → store material → enqueue processing.
 // A failed fetch never advances the success cursor; the source's health reflects consecutive failures.
 import { sql, type Db } from "../db.ts";
+import { config } from "../config.ts";
 import { identityKeyFor, upsertMaterial } from "../content/materials.ts";
 import { identityKeyForUrl } from "../lib/url.ts";
 import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
@@ -170,6 +171,8 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
     // so an entry cut here would never be offered again.
 
     // Detail pages only for material we have not seen (bounded per run), and only for what the listing lacks.
+    const batched = config.titleBatchEnabled && source.participation_mode === "editorial"
+      && ["rss", "web_list", "json_list"].includes(source.kind);
     const d = source.config.detail;
     const known = d ? await storedTitles(candidates.map((c) => c.identityKey!)) : new Map<string, string>();
     const detailBudget = Number(d?.maxFetches ?? 0);
@@ -187,8 +190,8 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
       const need: DetailNeed = {
         date: !c.publishedAt || d.upgradeDatePrecision === true,
         title: !!(d.titleSelector || d.titleRegex) && (d.titleAuthoritative === true || needsTitle(c.title)),
-        summary: !!d.summarySelector && !c.excerpt,
-        body: source.participation_mode === "editorial" && !c.bodyText && (!c.bodyStatus || c.bodyStatus === "pending"),
+        summary: !batched && !!d.summarySelector && !c.excerpt,
+        body: !batched && source.participation_mode === "editorial" && !c.bodyText && (!c.bodyStatus || c.bodyStatus === "pending"),
       };
       if (!need.date && !need.title && !need.summary) continue;
       detailUsed += 1;

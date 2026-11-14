@@ -5,15 +5,21 @@
 // an article wait and retry with backoff; only a permanent refusal or exhausted retries end in
 // "failed", which the admin re-queues in bulk.
 import type { PgBoss } from "pg-boss";
+import { addDays, beijingDate, beijingMidnight } from "@aihot/contracts/time";
+import { config } from "../config.ts";
 import { sql, type Db } from "../db.ts";
 import { extractArticleBody, pageFetchable } from "../content/extract.ts";
 import { analyzeArticle, AnalysisInterruptedError } from "../editorial/analyze.ts";
 import { isHistorical } from "../content/materials.ts";
-import { publishArticle } from "../publication/publish.ts";
-import { BudgetExceededError, ProviderRejectedError, ReceiptBusyError, ReceiptUnknownError } from "../providers/receipts.ts";
+import { publishArticle, publishArticleTx } from "../publication/publish.ts";
+import { seatedCondition } from "../publication/scope.ts";
+import { screenTitleBatch, supportedSelection, titleBatchSubject, TITLE_BATCH_LIMIT, TITLE_BATCH_PURPOSE, TITLE_BATCH_VERSION, TITLE_SELECTION_TAG, type TitleBatchItem, type TitleBatchRound } from "../editorial/title-batch.ts";
+import { getSelectionMaterials } from "../editorial/selection-material.ts";
+import { normalizeUrl } from "../lib/url.ts";
+import { BudgetExceededError, completeReceipt, ProviderRejectedError, ReceiptBusyError, ReceiptUnknownError } from "../providers/receipts.ts";
 import { ModelOutputError } from "../providers/llm.ts";
 import { ModelLimitBusyError } from "../providers/model-limit.ts";
-import { enqueue, QUEUES, shutdownSignal, work } from "./queue.ts";
+import { enqueue, ensureQueue, QUEUES, shutdownSignal, work } from "./queue.ts";
 
 /** Minutes to wait after the n-th failed attempt; one more failure after the last ends in "failed". */
 const RETRY_MINUTES = [5, 10, 20, 40, 60, 120, 240, 360];
@@ -31,7 +37,12 @@ interface Route {
   /** Not an editorial source: no analysis; the post goes straight to event grouping as discussion evidence. */
   signal: boolean;
   historical: boolean;
+  titleBatch: boolean;
+  processingAttemptTag: string | null;
 }
+
+const usesTitleBatch = (source: { participation_mode: string; kind: string; selected: boolean }) =>
+  config.titleBatchEnabled && !source.selected && source.participation_mode === "editorial" && ["rss", "web_list", "json_list"].includes(source.kind);
 
 /**
  * The article's next step: its body first while none is confirmed and the source asks for full text,
@@ -40,10 +51,10 @@ interface Route {
  * history adds no heat).
  */
 async function route(articleId: string, db: Db): Promise<Route | null> {
-  const [row] = await db<{ body_status: string; participation_mode: string; kind: string; config: Record<string, unknown>; url: string; bare: boolean; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
+  const [row] = await db<{ body_status: string; participation_mode: string; kind: string; config: Record<string, unknown>; url: string; bare: boolean; backfill: boolean; published_at: Date | null; discovered_at: Date; selected: boolean; processing_attempt_tag: string | null }[]>`
     SELECT a.body_status, s.participation_mode, s.kind, s.config, a.url, (coalesce(a.body_text, '') = '' AND a.x_post IS NULL) AS bare,
-           a.backfill, a.published_at, a.discovered_at
-    FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ${articleId}`;
+           a.backfill, a.published_at, a.discovered_at, coalesce(p.selected, false) AS selected, a.processing_attempt_tag
+    FROM articles a JOIN sources s ON s.id = a.source_id LEFT JOIN publications p ON p.article_id = a.id WHERE a.id = ${articleId}`;
   if (!row) return null;
   const historical = isHistorical(row);
   const signal = row.participation_mode !== "editorial";
@@ -51,7 +62,8 @@ async function route(articleId: string, db: Db): Promise<Route | null> {
   const wantsBody = row.config.fetchPublicContent === true || !!row.config.detail || row.kind === "web_list";
   const needsPage = !signal && (wantsBody || (row.bare && pageFetchable(row.url, row.kind)));
   const needsXArticle = row.kind === "x_search" && (!signal || (row.participation_mode === "hot_signal" && !historical));
-  return { step: pending && (needsPage || needsXArticle) ? "extract" : "analyze", signal, historical };
+  return { step: pending && (needsPage || needsXArticle) ? "extract" : "analyze", signal, historical,
+    titleBatch: usesTitleBatch(row), processingAttemptTag: row.processing_attempt_tag };
 }
 
 /**
@@ -70,6 +82,8 @@ export async function queueProcessing(articleId: string, opts: { step?: Step; at
   const db = opts.db ?? sql;
   const r = await route(articleId, db);
   if (!r) return null;
+  if (r.titleBatch && !opts.step && !opts.attemptTag
+    && (!r.processingAttemptTag || r.processingAttemptTag.startsWith(TITLE_SELECTION_TAG))) return null;
   const step = opts.step ?? r.step;
   const [queued] = await db<{ processing_attempt_tag: string | null }[]>`
     UPDATE articles SET processing_queued_at = now(), processing_attempt_tag = coalesce(${opts.attemptTag ?? null}, processing_attempt_tag)
@@ -77,7 +91,7 @@ export async function queueProcessing(articleId: string, opts: { step?: Step; at
   if (!queued) return null;
   // Extraction and the sweep only carry articleId; retain the current evaluation's paid identity.
   const attemptTag = queued.processing_attempt_tag ?? undefined;
-  if (step === "extract") return enqueue(QUEUES.extractBody, { articleId }, { singletonKey: articleId, priority: r.historical ? PRIORITY.history : PRIORITY.live }, opts.db);
+  if (step === "extract") return enqueue(QUEUES.extractBody, { articleId, ...(opts.step && opts.db ? { force: true } : {}) }, { singletonKey: articleId, priority: r.historical ? PRIORITY.history : PRIORITY.live }, opts.db);
   if (r.signal && !attemptTag) {
     return enqueue(QUEUES.group, { articleId, signalOnly: true }, { singletonKey: articleId, priority: r.historical ? PRIORITY.history : PRIORITY.liveSignal }, opts.db);
   }
@@ -101,8 +115,9 @@ export async function settleNonEditorial(articleId: string): Promise<{ group: bo
 }
 
 async function processingInput(articleId: string) {
-  const [row] = await sql<{ participation_mode: string; revision: number; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
-    SELECT s.participation_mode, a.revision, a.backfill, a.published_at, a.discovered_at FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ${articleId}`;
+  const [row] = await sql<{ participation_mode: string; kind: string; revision: number; backfill: boolean; published_at: Date | null; discovered_at: Date; selected: boolean }[]>`
+    SELECT s.participation_mode, s.kind, a.revision, a.backfill, a.published_at, a.discovered_at, coalesce(p.selected, false) AS selected
+    FROM articles a JOIN sources s ON s.id = a.source_id LEFT JOIN publications p ON p.article_id = a.id WHERE a.id = ${articleId}`;
   return row ? { ...row, historical: isHistorical(row) } : null;
 }
 
@@ -112,8 +127,10 @@ async function processingInput(articleId: string) {
  * request; the same tag reuses its receipt.
  */
 export async function processArticle(articleId: string, opts: { attemptTag?: string } = {}): Promise<{ state: string; retryAt?: Date }> {
+  if (config.titleBatchEnabled && opts.attemptTag?.startsWith(TITLE_SELECTION_TAG)) return { state: "waiting-for-news-round" };
   const row = await processingInput(articleId);
   if (!row) return { state: "missing" };
+  if (usesTitleBatch(row) && !opts.attemptTag) return { state: "waiting-for-title-batch" };
   try {
     return await processRevision(articleId, row, opts);
   } catch (error) {
@@ -185,8 +202,175 @@ async function afterFailure(articleId: string, revision: number, error: unknown)
   return { state: "retrying", retryAt };
 }
 
+export async function enqueueTitleBatch() {
+  const empty = { enqueued: false, titles: 0, candidates: 0, withMaterials: 0 };
+  if (!config.titleBatchEnabled || !config.modelCallsEnabled) return empty;
+  await ensureQueue(QUEUES.titleBatch);
+  if ((await sql`SELECT 1 FROM pgboss.job WHERE name = ${QUEUES.titleBatch}
+    AND state IN ('created', 'active', 'retry') LIMIT 1`).length) return empty;
+  const items = await sql<TitleBatchItem[]>`
+    SELECT a.id, a.revision, a.title FROM articles a JOIN sources s ON s.id = a.source_id
+    WHERE a.processing_state = 'new' AND a.processing_attempt_tag IS NULL
+      AND s.enabled AND s.participation_mode = 'editorial' AND s.kind IN ('rss', 'web_list', 'json_list')
+      AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.article_id = a.id AND p.selected)
+      AND a.updated_at < now() - interval '1 minute'
+      AND (a.processing_retry_at IS NULL OR a.processing_retry_at <= now())
+    ORDER BY a.discovered_at, a.id LIMIT ${TITLE_BATCH_LIMIT}`;
+  const candidates = await sql<(TitleBatchItem & { tag: string; url: string; body_html: string | null; first_party: boolean; excerpt: string | null })[]>`
+    SELECT a.id,a.revision,a.title,a.url,a.body_html,a.excerpt,s.first_party,a.processing_attempt_tag AS tag
+    FROM articles a JOIN sources s ON s.id = a.source_id
+    WHERE a.processing_state = 'new' AND a.processing_attempt_tag LIKE ${TITLE_SELECTION_TAG + "%"}
+      AND s.enabled AND s.participation_mode = 'editorial'
+    ORDER BY a.discovered_at, a.id LIMIT 2`;
+  const reviews = await Promise.all(candidates.map(async ({ url, body_html, first_party, excerpt, ...item }) => ({
+    ...item, materials: await getSelectionMaterials(url, body_html, first_party, excerpt),
+  })));
+  const withMaterials = reviews.filter(r => r.materials.length > 0).length;
+  if (!items.length && !withMaterials) {
+    await sql.begin(async tx => {
+      for (const item of reviews) await settleTitleSelection(tx, item);
+    });
+    return { ...empty, candidates: reviews.length };
+  }
+  const selected = await sql<TitleBatchRound["selected"]>`
+    SELECT p.title,coalesce(an.output->>'evidenceUrl',p.url) AS url
+    FROM publications p LEFT JOIN analyses an ON an.id=p.analysis_id
+    WHERE ${seatedCondition(new Date())} AND p.timeline_at >= now() - interval '7 days'
+    ORDER BY p.timeline_at DESC,p.article_id LIMIT 20`;
+  const id = await enqueue(QUEUES.titleBatch, { items, reviews, selected: [...selected] }, { singletonKey: "automatic" });
+  return { enqueued: !!id, titles: items.length, candidates: reviews.length, withMaterials };
+}
+
+async function settleTitleSelection(tx: Db, item: TitleBatchRound["reviews"][number]) {
+  return (await tx`UPDATE articles SET processing_state='analyzed', processing_attempt_tag=NULL,
+    processing_queued_at=NULL, processing_retry_at=NULL, processing_attempts=0, processing_error=NULL,
+    grouping_status='complete'
+    WHERE id=${item.id} AND revision=${item.revision} AND processing_attempt_tag=${item.tag}
+      AND processing_state='new' AND EXISTS (
+        SELECT 1 FROM sources s WHERE s.id=articles.source_id AND s.enabled AND s.participation_mode='editorial'
+      ) RETURNING id`).length > 0;
+}
+
+export async function processTitleBatch(round: TitleBatchRound) {
+  const { items, reviews } = round;
+  if (!items.length && !reviews.length) return { screened: 0 };
+  const revisions = sql.json(items.map(({ id, revision }) => ({ id, revision })));
+  const [ready] = await sql`SELECT 1 FROM articles a JOIN sources s ON s.id = a.source_id
+    JOIN jsonb_to_recordset(${revisions}::jsonb) AS batch(id text, revision int)
+      ON a.id = batch.id AND a.revision = batch.revision
+    WHERE a.processing_state = 'new' AND a.processing_attempt_tag IS NULL AND s.enabled AND s.participation_mode = 'editorial'
+      AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.article_id = a.id AND p.selected)
+    LIMIT 1`;
+  const reviewInputs = sql.json(reviews.filter(r => r.materials.length).map(({ id, revision, tag }) => ({ id, revision, tag })));
+  const [reviewReady] = await sql`SELECT 1 FROM articles a JOIN sources s ON s.id=a.source_id
+    JOIN jsonb_to_recordset(${reviewInputs}::jsonb) AS batch(id text, revision int, tag text)
+      ON a.id=batch.id AND a.revision=batch.revision AND a.processing_attempt_tag=batch.tag
+    WHERE a.processing_state='new' AND s.enabled AND s.participation_mode='editorial' LIMIT 1`;
+  if (!ready && !reviewReady) return { screened: 0 };
+  let result;
+  try {
+    result = await screenTitleBatch(round);
+  } catch (error) {
+    if (error instanceof BudgetExceededError || error instanceof ModelLimitBusyError || error instanceof ReceiptBusyError) {
+      const seconds = error instanceof ReceiptBusyError ? 60 : error.retryAfterSeconds;
+      // Retain the exact batch across budget waits so its paid identity cannot change.
+      await enqueue(QUEUES.titleBatch, round, { singletonKey: titleBatchSubject(round), startAfter: seconds });
+      return { screened: 0, waiting: seconds };
+    }
+    if (error instanceof ReceiptUnknownError || error instanceof ModelOutputError || (error instanceof ProviderRejectedError && !error.retryable)) {
+      const reason = error instanceof ReceiptUnknownError ? "title batch receipt " + titleBatchSubject(round) : error.message.slice(0, 500);
+      await sql`UPDATE articles a SET processing_state = 'failed',
+        processing_error = ${reason}
+        FROM jsonb_to_recordset(${revisions}::jsonb) AS batch(id text, revision int)
+        WHERE a.id = batch.id AND a.revision = batch.revision AND a.processing_state = 'new' AND a.processing_attempt_tag IS NULL`;
+      await sql`UPDATE articles a SET processing_state='failed', processing_error=${reason}
+        FROM jsonb_to_recordset(${reviewInputs}::jsonb) AS batch(id text, revision int, tag text)
+        WHERE a.id=batch.id AND a.revision=batch.revision AND a.processing_attempt_tag=batch.tag AND a.processing_state='new'`;
+      return { screened: 0, failed: items.length, ...(error instanceof ProviderRejectedError ? {} : { receiptId: error.receiptId }) };
+    }
+    throw error;
+  }
+  const counts = { pass: 0, block: 0, unknown: 0, review: 0, reviewed: 0, selected: 0, duplicate: 0 };
+  await sql.begin(async (tx) => {
+    // A single transaction completes the whole receipt. A crash before commit can reuse the answer.
+    const usedEvidence = new Set(round.selected.map(s => normalizeUrl(s.url)));
+    for (const decision of [...result.data.reviews].sort((a,b) => a.n - b.n)) {
+      const item = reviews[decision.n - 1]!;
+      if (!(await settleTitleSelection(tx, item))) continue;
+      const material = supportedSelection(item, decision);
+      const key = material && normalizeUrl(material.url);
+      const duplicate = decision.verdict === "duplicate" || !!(key && usedEvidence.has(key));
+      const select = !!(material && key && !duplicate);
+      if (select) usedEvidence.add(key);
+      await tx`INSERT INTO analyses (article_id,input_revision,origin,model,prompt_version,receipt_ids,relevance,category,title_zh,summary_zh,selected,output)
+        VALUES (${item.id},${item.revision},'model',${result.model},${TITLE_BATCH_VERSION},${[result.receiptId]},'pass',
+          (SELECT category FROM analyses WHERE article_id=${item.id} AND output->>'screening'=${TITLE_BATCH_PURPOSE}
+            ORDER BY input_revision DESC,id DESC LIMIT 1),
+          ${select ? decision.titleZh ?? null : null},${select ? decision.summaryZh ?? null : null},${select},
+          ${tx.json({ titleSelection: true, batchedReview: true, verdict: select ? "select" : duplicate ? "duplicate" : "keep",
+            evidenceUrl: select ? key : null, evidenceKind: select ? material?.kind : null, evidence: select ? decision.evidence : null } as never)})`;
+      await publishArticleTx(tx, item.id);
+      counts.reviewed += 1;
+      if (select) counts.selected += 1;
+      if (duplicate) counts.duplicate += 1;
+    }
+    for (const decision of [...result.data.items].sort((a, b) => a.n - b.n)) {
+      const item = items[decision.n - 1]!;
+      const [a] = await tx<{ excerpt: string | null; url: string; kind: string; tier: string; coverage: string | null }[]>`
+        SELECT a.excerpt, a.url, s.kind, s.tier, a.coverage
+        FROM articles a JOIN sources s ON s.id = a.source_id
+        WHERE a.id = ${item.id} AND a.revision = ${item.revision} AND a.processing_state = 'new'
+          AND a.processing_attempt_tag IS NULL AND s.enabled AND s.participation_mode = 'editorial'
+          AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.article_id = a.id AND p.selected)
+        FOR UPDATE OF a`;
+      if (!a) continue;
+      const review = decision.relevance === "pass" && decision.review && decision.sameAs == null && counts.review < 2 &&
+        a.tier !== "EXCLUDE_MP" && pageFetchable(a.url, a.kind);
+      const attemptTag = review ? TITLE_SELECTION_TAG + result.receiptId : null;
+      const summary = decision.relevance === "pass" && a.coverage !== "public_excerpt" ? a.excerpt?.trim() || null : null;
+      const evidence = {
+        screening: TITLE_BATCH_PURPOSE, coverage: summary ? "official_abstract" : "metadata_only",
+        review, ...(decision.sameAs == null ? {} : { possibleDuplicateOf: items[decision.sameAs - 1]!.id }),
+      };
+      await tx`INSERT INTO analyses (article_id, input_revision, origin, model, prompt_version, receipt_ids, relevance, category, title_zh, summary_zh, selected, output)
+        VALUES (${item.id}, ${item.revision}, 'model', ${result.model}, ${TITLE_BATCH_VERSION}, ${[result.receiptId]}, ${decision.relevance},
+          ${decision.category ?? null}, ${decision.titleZh ?? null}, ${summary}, false, ${tx.json(evidence as never)})`;
+      await tx`UPDATE articles SET processing_state = ${review ? "new" : decision.relevance === "block" ? "blocked" : "analyzed"},
+        processing_attempt_tag = ${attemptTag}, processing_attempts = 0, processing_retry_at = NULL, processing_error = NULL,
+        processing_queued_at = NULL,
+        grouping_status = ${review ? "pending" : "complete"}
+        WHERE id = ${item.id}`;
+      await publishArticleTx(tx, item.id);
+      if (review) counts.review += 1;
+      counts[decision.relevance] += 1;
+    }
+    await completeReceipt(tx, result.receiptId);
+  });
+  return { screened: counts.pass + counts.block + counts.unknown, ...counts, receiptId: result.receiptId, reused: result.reused, usage: result.usage };
+}
+
+/** Daily production usage, counted from provider attempts rather than processed articles. */
+export async function recordNewsRoundUsage(now = new Date()) {
+  const today = beijingDate(now);
+  const date = addDays(today, -1);
+  const [totals] = await sql<{ calls: number; withUsage: number; tokensIn: number; tokensOut: number; tokensTotal: number }[]>`
+    SELECT count(*)::int AS calls,
+           count(a.usage)::int AS "withUsage",
+           coalesce(sum((a.usage->>'prompt_tokens')::bigint),0)::float8 AS "tokensIn",
+           coalesce(sum((a.usage->>'completion_tokens')::bigint),0)::float8 AS "tokensOut",
+           coalesce(sum(coalesce((a.usage->>'total_tokens')::bigint,
+             (a.usage->>'prompt_tokens')::bigint + (a.usage->>'completion_tokens')::bigint)),0)::float8 AS "tokensTotal"
+    FROM receipt_attempts a JOIN receipts r ON r.id=a.receipt_id
+    WHERE r.purpose=${TITLE_BATCH_PURPOSE} AND a.origin='live'
+      AND a.started_at >= ${beijingMidnight(date)} AND a.started_at < ${beijingMidnight(today)}`;
+  return { date, ...totals! };
+}
+
 export async function registerContentJobs(boss: PgBoss) {
   await work(boss, QUEUES.analyze, { localConcurrency: 3, pollingIntervalSeconds: 2 }, ({ articleId, attemptTag }) => processArticle(articleId, { attemptTag }));
+  if (config.titleBatchEnabled) {
+    await work(boss, QUEUES.titleBatch, { localConcurrency: 1, pollingIntervalSeconds: 2 }, processTitleBatch);
+  }
 }
 
 /**
@@ -194,9 +378,13 @@ export async function registerContentJobs(boss: PgBoss) {
  * on the excerpt it has ("unconfirmed" body, never a wrong one).
  */
 export async function registerExtractionJobs(boss: PgBoss) {
-  await work(boss, QUEUES.extractBody, { localConcurrency: 2, pollingIntervalSeconds: 2 }, async ({ articleId }) => {
-    const [input] = await sql<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${articleId}`;
+  await work(boss, QUEUES.extractBody, { localConcurrency: 2, pollingIntervalSeconds: 2 }, async ({ articleId, force }) => {
+    const [input] = await sql<{ revision: number; processing_attempt_tag: string | null; kind: string; participation_mode: string; selected: boolean }[]>`
+      SELECT a.revision, a.processing_attempt_tag, s.kind, s.participation_mode, coalesce(p.selected, false) AS selected
+      FROM articles a JOIN sources s ON s.id = a.source_id LEFT JOIN publications p ON p.article_id = a.id WHERE a.id = ${articleId}`;
     if (!input) return { state: "missing" };
+    if (config.titleBatchEnabled && input.processing_attempt_tag?.startsWith(TITLE_SELECTION_TAG)) return { state: "waiting-for-news-round" };
+    if (usesTitleBatch(input) && !input.processing_attempt_tag && !force) return { state: "waiting-for-title-batch" };
     try {
       const state = await extractArticleBody(articleId);
       // Extraction's failures do not count against the analysis that follows (a new revision starts over anyway).
@@ -234,6 +422,11 @@ export async function sweepUnprocessed(): Promise<{ enqueued: number }> {
   const rows = await sql<{ id: string }[]>`
     SELECT id FROM articles
     WHERE processing_state = 'new' AND created_at < now() - interval '3 minutes'
+      AND (NOT ${config.titleBatchEnabled} OR processing_attempt_tag IS NULL OR processing_attempt_tag NOT LIKE ${TITLE_SELECTION_TAG + "%"})
+      AND (NOT ${config.titleBatchEnabled} OR processing_attempt_tag IS NOT NULL OR NOT EXISTS (
+        SELECT 1 FROM sources s WHERE s.id = articles.source_id AND s.participation_mode = 'editorial'
+        AND s.kind IN ('rss', 'web_list', 'json_list')) OR EXISTS (
+        SELECT 1 FROM publications p WHERE p.article_id = articles.id AND p.selected))
       AND (processing_retry_at IS NULL OR processing_retry_at <= now())
       AND (processing_queued_at IS NULL OR processing_queued_at < now() - ${QUEUED_STALE}::interval)
     ORDER BY discovered_at DESC LIMIT 500`;
@@ -253,6 +446,11 @@ const ARTICLE_STEPS = new Set(["prefilter_article", "score_article", "structure_
  * back to processing: one action, not two. Returns whether it was queued.
  */
 export async function resumeAfterRelease(receipt: { purpose: string; subject: string | null }, db: Db): Promise<boolean> {
+  if (receipt.purpose === TITLE_BATCH_PURPOSE) {
+    const rows = await db`UPDATE articles SET processing_state = 'new', processing_error = NULL, processing_retry_at = NULL
+      WHERE processing_state = 'failed' AND processing_error = ${"title batch receipt " + receipt.subject} RETURNING id`;
+    return rows.length > 0;
+  }
   const article = ARTICLE_STEPS.has(receipt.purpose) ? /^article:([^@:#]+)/.exec(receipt.subject ?? "")?.[1] : undefined;
   if (!article) return false;
   const [a] = await db`UPDATE articles SET processing_state = 'new', processing_attempts = 0, processing_retry_at = NULL, processing_error = NULL

@@ -58,6 +58,7 @@ export const config = {
   // External-action valve: off unless the environment turns it on, like COLLECT_ENABLED (read by the
   // worker). .env.example ships both off, so a blank deployment collects nothing and calls no model.
   modelCallsEnabled: bool("MODEL_CALLS_ENABLED", false),
+  titleBatchEnabled: bool("NEWS_TITLE_BATCH_ENABLED", false),
   devAdmin: env.DEV_AUTH_ROLE === "admin" ? { displayName: env.DEV_AUTH_DISPLAY_NAME || "Dev Admin" } : null,
   /** The admin password (at least 12 characters). Feishu sign-in below is optional. */
   adminPassword: env.ADMIN_PASSWORD || null,
