@@ -2,6 +2,19 @@
 
 [中文](README.md) | [English](README.en.md)
 
+> **当前为轻量天文信息汇总实验分支，不是综合网站生产升级。** 整合PR #8、#9，偏向来源降噪、标题合批与原文导流。仍有付费恢复和手工提取阻塞项，详见[分支差异与使用边界](docs/EXPERIMENTAL-EDITORIAL-AGGREGATION.md)。
+>
+> **Experimental lightweight astronomy aggregation; not production-ready.** See the [branch comparison and limitations](docs/EXPERIMENTAL-EDITORIAL-AGGREGATION.md).
+
+## 分支选择
+
+| 分支 | 用途与部署建议 |
+| --- | --- |
+| [`main`](https://github.com/sw2sw/AstroHot/tree/main) | 综合天文资讯与阅读平台的默认维护分支、生产发布候选。生产部署仍应选经过环境验收的固定版本。 |
+| [`experiment/editorial-cost-reduction`](https://github.com/sw2sw/AstroHot/tree/experiment/editorial-cost-reduction) | 轻量天文信息汇总实验路线；编辑策略与默认流程不同，尚不推荐用于生产。 |
+
+分支名不代表已完成部署或验收。本实验仍基于同一综合框架，并非已拆成独立产品。历史过程分支不是独立的推荐部署版本。
+
 **天文资讯、论文初筛与双语阅读平台。**
 
 AstroHot 汇集天文新闻与论文元数据，保留来源和原文入口，使用可配置模型辅助筛选、摘要与翻译，通过 Web 和 API 提供阅读。适合自行部署，也欢迎天文、前端、后端和文档方向的贡献者参与。

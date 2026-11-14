@@ -30,7 +30,7 @@ APS Physics与Nature Astronomy在较早配置备注中曾列“首版不接入�
 | Science · Space | `rss-journal-science-space` | https://www.science.org/action/showFeed?ui=0&mi=sfug99&type=search&feed=rss&query=%2526ConceptID%253D502894%2526target%253Dtopic |
 | Sky & Telescope · 天文新闻 | `rss-journal-sky-telescope` | https://skyandtelescope.org/astronomy-news/feed/ |
 | Astronomy Magazine · News | `rss-journal-astronomy-magazine` | https://www.astronomy.com/tags/news/feed/ |
-| Nature · 综合 | `rss-journal-nature` | https://www.nature.com/nature.rss |
+| Nature · 天文与行星科学 | `rss-journal-nature` | https://www.nature.com/subjects/astronomy-and-planetary-science/nature.rss |
 | Scientific American | `rss-journal-scientific-american` | https://www.scientificamerican.com/platform/syndication/rss/ |
 | Quanta Magazine · Astronomy | `rss-journal-quanta-astronomy` | https://www.quantamagazine.org/tag/astronomy/feed/ |
 | New Scientist · Space | `rss-journal-new-scientist-space` | https://www.newscientist.com/subject/space/feed/ |
@@ -39,6 +39,8 @@ APS Physics与Nature Astronomy在较早配置备注中曾列“首版不接入�
 | Nature Astronomy | `rss-journal-nature-astronomy` | https://www.nature.com/natastron.rss |
 
 Astronomy News和Sky This Week可能重复出现同一文章，按规范URL/材料身份去重，不把两个feed计为两篇新文章。Nature、Scientific American、APS等综合内容源的feed条数不等于天文有效条数。
+
+Nature 使用天文与行星科学专题 RSS，仍需判断单篇的天文相关性。Astronomy Magazine News 在入口排除器材与 Ask Astro 分类，New Scientist Space 排除军事分类。各项过滤只作用于对应来源，候选源由部署者自行启用。
 
 ## 3. 与普通新闻源分开的模块
 

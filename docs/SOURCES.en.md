@@ -30,7 +30,7 @@ Earlier configuration notes listed APS Physics and Nature Astronomy as “not in
 | Science · Space | `rss-journal-science-space` | https://www.science.org/action/showFeed?ui=0&mi=sfug99&type=search&feed=rss&query=%2526ConceptID%253D502894%2526target%253Dtopic |
 | Sky & Telescope · Astronomy News | `rss-journal-sky-telescope` | https://skyandtelescope.org/astronomy-news/feed/ |
 | Astronomy Magazine · News | `rss-journal-astronomy-magazine` | https://www.astronomy.com/tags/news/feed/ |
-| Nature · General | `rss-journal-nature` | https://www.nature.com/nature.rss |
+| Nature · Astronomy and planetary science | `rss-journal-nature` | https://www.nature.com/subjects/astronomy-and-planetary-science/nature.rss |
 | Scientific American | `rss-journal-scientific-american` | https://www.scientificamerican.com/platform/syndication/rss/ |
 | Quanta Magazine · Astronomy | `rss-journal-quanta-astronomy` | https://www.quantamagazine.org/tag/astronomy/feed/ |
 | New Scientist · Space | `rss-journal-new-scientist-space` | https://www.newscientist.com/subject/space/feed/ |
@@ -39,6 +39,8 @@ Earlier configuration notes listed APS Physics and Nature Astronomy as “not in
 | Nature Astronomy | `rss-journal-nature-astronomy` | https://www.nature.com/natastron.rss |
 
 Astronomy News and Sky This Week may contain the same article. Deduplicate by canonical URL / material identity rather than counting the two feeds as two new articles. Feed-item counts from general-content sources such as Nature, Scientific American, and APS are not counts of valid astronomy items.
+
+Nature uses the astronomy and planetary-science feed. The feed can still contain mixed-topic material, so the astronomy relevance filter remains necessary. Astronomy Magazine News excludes equipment and Ask Astro categories. New Scientist Space excludes Military. These are source-specific filters; the options remain disabled until an operator enables them.
 
 ## 3. Modules Separate from Ordinary News Sources
 
