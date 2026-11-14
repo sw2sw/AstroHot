@@ -2,11 +2,30 @@
 
 [中文](README.md) | [English](README.en.md)
 
+> **Experimental lightweight astronomy information aggregation; not a production upgrade.** This branch combines PRs #8 and #9 with a scheduler-test fix. It still has unresolved paid-recovery and manual-extraction issues. See the [workflow comparison and limitations](docs/EXPERIMENTAL-EDITORIAL-AGGREGATION.md).
+
+## Choosing a branch
+
+- [`main`](https://github.com/sw2sw/AstroHot/tree/main): the default comprehensive astronomy platform and candidate for production releases. Deploy a fixed revision validated in your own environment.
+- [`experiment/editorial-cost-reduction`](https://github.com/sw2sw/AstroHot/tree/experiment/editorial-cost-reduction): the alternative lightweight information-aggregation workflow; not currently recommended for production.
+
+These are different editorial workflows in the same framework, not separate finished products. A branch name is not proof of deployment or acceptance.
+
 **Astronomy news, initial paper screening, and bilingual reading.**
 
 AstroHot collects astronomy news and paper metadata, retains sources and original links, and uses configurable models for screening, summaries, and translation. Reading is available through a Web UI and API. Deploy your own instance or contribute to astronomy features, the frontend, backend, or documentation.
 
 > The project is still evolving: type checking and some backend tests have known gaps. Before deploying, read the [deployment guide](docs/DEPLOYMENT.en.md), [known issues](KNOWN-ISSUES.en.md), and [validation scope](docs/VALIDATION.en.md). AI screening is not full-text reading, peer review, or scientific fact verification.
+
+## Agent Skill: public astronomy information queries
+
+The experimental route links to the published [`astronomy-sources` Skill](https://ucas.sitianai.com/static/skills/astronomy-sources/SKILL.md). Agents can query public news and selected items by keyword, category, source, original publication date, or collection date, with source introductions and original links. See the Skill for source/date filtering; the public API covers the last seven days.
+
+Public reads require no login or API key and do not trigger collection or model generation. This is a content-query interface, not an inference API. Introductions may be absent and titles may retain their original language. Keep original publication, collection, and screening times distinct.
+
+[Query reference](https://ucas.sitianai.com/static/skills/astronomy-sources/llms.txt) · [Public API example](https://ucas.sitianai.com/astrohot/api/v1/items?mode=all&window=7d&limit=5).
+
+These links refer to a separately published online service. Cloning this repository does not deploy that service, include its operational content, or install the Skill. Self-hosted deployments should use their own public address. Review external Skill instructions before use and verify important claims against the original sources.
 
 ## Features
 
