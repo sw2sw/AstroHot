@@ -55,3 +55,9 @@ Manual “Fetch now” is an active network action, and reanalysis may incur add
 The source anchors the first attempt at **05:30 UTC (13:30 Beijing)**. Each minute only polls durable `next_due_at`; a not-due poll makes no source request. The budget remains three attempts per UTC day with strictly at least six elapsed hours between actual admissions. Empty/failed rounds can therefore retry at 19:30 Beijing and 01:30 the next local day; these are not fixed slots. Productive/partial day closure, operator pauses, HTTP429/Retry-After, leases and paid-receipt protections are unchanged.
 
 An upgrade neither resets spent attempts nor advances an existing retry or later due instant. An admission at 09:00:19 Beijing still owns a floor of 15:00:19 that day; the new first-attempt anchor applies on subsequent days. Source changes are not proof of a production deployment; the operator decides when to run them.
+
+## Optional batched news screening
+
+Set `NEWS_TITLE_BATCH_ENABLED=true` together with `MODEL_CALLS_ENABLED=true` to use the batch workflow for editorial RSS and web/JSON lists. At 08:00, 13:00 and 20:00 Asia/Shanghai time the worker combines up to 32 new headlines and up to two previous candidates in one request. Additional headlines wait for the next round. Ordinary items keep the source introduction when present and otherwise show the title and original link. Shortlisted items stay ordinary if the next round cannot find a supported official release or paper abstract. Empty rounds make no calls.
+
+Existing provider budgets and receipts apply. At 00:10 the run log records the previous day's production attempts, the number with reported usage and input/output/total tokens. The default is off, and arXiv has its own workflow.

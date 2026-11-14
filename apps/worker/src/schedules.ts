@@ -8,9 +8,9 @@ import { imageryDailyEnabled, runImageryDaily } from "@aihot/backend/imagery/dai
 import type { PgBoss } from "pg-boss";
 import { FEATURES } from "@aihot/industry/features";
 import { CODEX_RESET_SCAN_MINUTES } from "@aihot/contracts/monitor";
-import { credential } from "@aihot/backend/config";
+import { config, credential } from "@aihot/backend/config";
 import { ensureQueue, recordRun } from "@aihot/backend/jobs/queue";
-import { sweepUnprocessed } from "@aihot/backend/jobs/content";
+import { enqueueTitleBatch, recordNewsRoundUsage, sweepUnprocessed } from "@aihot/backend/jobs/content";
 import { translatePending } from "@aihot/backend/editorial/translate";
 import { adaptIntervals, scheduleDueSources } from "@aihot/backend/sources/collect";
 import { scheduleMpReconcile } from "@aihot/backend/sources/mp";
@@ -90,6 +90,12 @@ export const SCHEDULES: Scheduled[] = [
     ? [{ name: "arxiv.collect", cron: "* * * * *", tz: "UTC", retryLimit: 0, record: "due" as const, run: (runId: number) => collectScheduledArxiv({ jobRunId: runId }) }]
     : []),
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },
+  ...(config.titleBatchEnabled && config.modelCallsEnabled
+    ? [
+        { name: "content.news-round", cron: "0 8,13,20 * * *", retryLimit: 0, run: () => enqueueTitleBatch() },
+        { name: "content.news-usage", cron: "10 0 * * *", missed: "once" as const, run: () => recordNewsRoundUsage() },
+      ]
+    : []),
   // Full-text translations of newly selected items (model calls; off with MODEL_CALLS_ENABLED=false).
   { name: "content.translate", cron: "*/5 * * * *", run: () => translatePending() },
   { name: "hot.rank", cron: "*/5 * * * *", run: () => computeHotRanking() },

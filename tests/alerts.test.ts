@@ -3,6 +3,7 @@
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { config } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
 import { getBoss, stopBoss } from "@aihot/backend/jobs/queue";
@@ -28,6 +29,31 @@ before(async () => {
 after(async () => {
   await stopBoss();
   await closeDb();
+});
+
+test("waiting for the next news round does not trigger an outage alert", async () => {
+  const now = Date.parse("2026-11-14T19:30:00+08:00");
+  const previous = config.titleBatchEnabled;
+  config.titleBatchEnabled = true;
+  process.env.COLLECT_ENABLED = "true";
+  process.env.MODEL_CALLS_ENABLED = "true";
+  try {
+    const warning = async () => (await collectFindings(now)).some(f => f.key === "content.process");
+    const shift = async (minutes: number) => {
+      const discovered = new Date(now - minutes * 60_000);
+      await sql`UPDATE articles SET discovered_at=now()-interval '3 hours',
+        updated_at=${discovered}, processing_attempt_tag='title-selection:test' WHERE id IN ${sql(stuckIds)}`;
+    };
+    await shift(180);
+    assert.equal(await warning(), false);
+    await shift(420);
+    assert.equal(await warning(), true);
+  } finally {
+    config.titleBatchEnabled = previous;
+    process.env.COLLECT_ENABLED = "false";
+    process.env.MODEL_CALLS_ENABLED = "false";
+    await sql`UPDATE articles SET processing_attempt_tag=NULL WHERE id IN ${sql(stuckIds)}`;
+  }
 });
 
 test("an outage is announced once, repeated hourly, and closed with one recovery", async () => {

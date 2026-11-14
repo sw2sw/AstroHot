@@ -4,8 +4,9 @@
 //   today  — money at risk or only the owner can act: sent at once, repeated at most daily, recovery reported.
 //   digest — other follow-ups: one 09:00 message a day, meant to be handed to the AI.
 // Delivery goes through sendAlert (ops chat, internal-chat fallback; off unless FEISHU_INTERNAL_ENABLED).
-import { beijingDate, beijingTime } from "@aihot/contracts/time";
+import { addDays, beijingDate, beijingTime } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
+import { config } from "../config.ts";
 import { beijingDay, beijingStamp, duration, formatAlert, formatRecovery, sendAlert, type Finding, type Level } from "../notify/feishu.ts";
 import { backupConfigured } from "./backup.ts";
 import { unmarkedBoardModels } from "../leaderboard/read.ts";
@@ -62,11 +63,29 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
         since: waiting[0]!.since,
       });
     }
+    const hour = Number(beijingTime(now).slice(0, 2));
+    const day = beijingDate(now);
+    const slot = hour >= 20 ? 20 : hour >= 13 ? 13 : hour >= 8 ? 8 : 20;
+    const lastRound = new Date(`${hour < 8 ? addDays(day, -1) : day}T${String(slot).padStart(2, "0")}:00:00+08:00`);
+    const waitingSince = new Date(Math.min(now - 2 * 3600_000, lastRound.getTime() - 60_000));
     const [p] = await sql<{ waiting: number; oldest: Date | null; failed: number }[]>`
-      SELECT count(*) FILTER (WHERE processing_state = 'new' AND discovered_at < now() - interval '2 hours')::int AS waiting,
-             min(discovered_at) FILTER (WHERE processing_state = 'new') AS oldest,
+      WITH articles_to_check AS (
+        SELECT a.processing_state, a.discovered_at, a.processing_attempt_tag, a.updated_at,
+          CASE WHEN ${config.titleBatchEnabled} AND s.participation_mode = 'editorial'
+            AND s.kind IN ('rss', 'web_list', 'json_list')
+            AND (a.processing_attempt_tag IS NULL OR a.processing_attempt_tag LIKE 'title-selection:%')
+            THEN ${waitingSince} ELSE ${new Date(now - 2 * 3600_000)} END AS cutoff
+        FROM articles a JOIN sources s ON s.id=a.source_id
+        WHERE (NOT ${config.titleBatchEnabled} OR s.enabled) AND a.processing_state IN ('new', 'failed')
+          AND a.discovered_at > now() - interval '2 days'
+      ), counted AS (
+        SELECT *, CASE WHEN ${config.titleBatchEnabled} AND processing_attempt_tag LIKE 'title-selection:%' THEN updated_at ELSE discovered_at END AS waiting_from
+        FROM articles_to_check
+      )
+      SELECT count(*) FILTER (WHERE processing_state = 'new' AND waiting_from < cutoff)::int AS waiting,
+             min(waiting_from) FILTER (WHERE processing_state = 'new' AND waiting_from < cutoff) AS oldest,
              count(*) FILTER (WHERE processing_state = 'failed' AND discovered_at > now() - interval '3 hours')::int AS failed
-      FROM articles WHERE processing_state IN ('new', 'failed') AND discovered_at > now() - interval '2 days'`;
+      FROM counted`;
     if (p!.waiting >= 10 || p!.failed >= 20) {
       const errors = await sql<{ error: string; n: number }[]>`
         SELECT left(coalesce(processing_error, '（无）'), 120) AS error, count(*)::int AS n FROM articles
@@ -76,7 +95,7 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
         key: "content.process",
         level: "now",
         title: "新内容卡住了，进不了网站",
-        impact: [p!.waiting >= 10 && `${p!.waiting} 篇新文章等了 2 小时以上还没处理完`, p!.failed >= 20 && `最近 3 小时 ${p!.failed} 篇新文章处理失败`]
+        impact: [p!.waiting >= 10 && `${p!.waiting} 篇文章已超过预计处理时间`, p!.failed >= 20 && `最近 3 小时 ${p!.failed} 篇新文章处理失败`]
           .filter(Boolean)
           .join("；") + "，精选和热点会缺内容",
         heals: p!.waiting >= 10 ? "服务恢复后会自动补处理" : "不会，需要修好后重新处理这些文章",

@@ -43,6 +43,9 @@ interface AnalysisRow {
   reason_zh: string | null;
   score: number | null;
   selected: boolean | null;
+  title_screening: boolean | null;
+  title_selection: boolean | null;
+  batched_review: boolean | null;
 }
 
 interface OverrideRow {
@@ -223,8 +226,16 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     SELECT id, name, kind, tier, participation_mode, first_party, site_fulltext, syndicate_fulltext FROM sources WHERE id = ${article.source_id}`;
   if (!source) return null;
   const [analysis] = await tx<AnalysisRow[]>`
-    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected
+    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected,
+           (output->>'screening' = 'prefilter_title_batch') AS title_screening,
+           (output->>'titleSelection' = 'true') AS title_selection,
+           (output->>'batchedReview' = 'true') AS batched_review
     FROM analyses WHERE article_id = ${articleId} ORDER BY input_revision DESC, id DESC LIMIT 1`;
+  // Keep the lightweight card if the next round does not confirm a selection.
+  const [headline] = analysis?.title_selection ? await tx<Pick<AnalysisRow, "relevance" | "category" | "title_zh" | "summary_zh">[]>`
+    SELECT relevance, category, title_zh, summary_zh FROM analyses
+    WHERE article_id = ${articleId} AND output->>'screening' = 'prefilter_title_batch'
+    ORDER BY input_revision DESC, id DESC LIMIT 1` : [];
   const [override] = await tx<OverrideRow[]>`SELECT fields, visibility FROM editorial_overrides WHERE article_id = ${articleId}`;
   const [membership] = await tx<{ fact_id: number; story_id: number | null }[]>`
     SELECT fa.fact_id, f.story_id FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id
@@ -243,21 +254,24 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
 
   const f = override?.fields ?? {};
   const isChineseTitle = article.language === "zh" || /[一-鿿]/.test(article.title);
+  const titleBatch = analysis?.title_screening === true || (analysis?.title_selection === true && (analysis.selected !== true || article.selection_adds_value === false) && !!headline);
+  const copy = titleBatch && headline ? headline : analysis;
   // An X post carries its Chinese in the summary and translation; without a Chinese title its own
   // text is the title, where an article would still be a half-finished card.
-  const zhTitle = analysis?.title_zh?.trim() ? analysis.title_zh : null;
-  const title = pickString(f.title, zhTitle ?? (isChineseTitle || article.x_post ? collapseWhitespace(article.title) : null));
-  const summary = pickString(f.summary, analysis?.summary_zh ?? null);
-  const category = pickString(f.category, analysis?.category ?? null);
+  const zhTitle = copy?.title_zh?.trim() ? copy.title_zh : null;
+  const title = pickString(f.title, zhTitle ?? (titleBatch || isChineseTitle || article.x_post ? collapseWhitespace(article.title) : null));
+  const summary = pickString(f.summary, copy?.summary_zh?.trim() || null);
+  const category = pickString(f.category, copy?.category ?? null);
   const tags = Array.isArray(f.tags) ? (f.tags as string[]) : [...new Set([...(analysis?.tags ?? []), ...(analysis?.subjects ?? []).map((s) => `entity:${s}`)])];
-  const score = typeof f.score === "number" ? f.score : analysis?.score ?? null;
-  const relevance = typeof f.relevance === "string" ? (f.relevance as string) : analysis?.relevance ?? null;
+  const score = typeof f.score === "number" ? f.score : titleBatch ? null : analysis?.score ?? null;
+  const relevance = typeof f.relevance === "string" ? f.relevance : copy?.relevance ?? null;
   const judgedSelected = typeof f.selected === "boolean" ? (f.selected as boolean) : analysis?.selected ?? null;
   // Material from an isolated source reaches no public surface at all: not even a detail page.
-  const visibility = source.participation_mode === "isolated" ? "withdrawn" : (override?.visibility ?? "public");
+  const hiddenScreening = titleBatch && relevance === "unknown";
+  const visibility = source.participation_mode === "isolated" ? "withdrawn" : (override?.visibility ?? (titleBatch && relevance === "block" || hiddenScreening ? "withdrawn" : "public"));
 
-  const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary });
-  const selectionCandidate = isSelectable(eligible, judgedSelected, source.tier);
+  const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary, titleBatch });
+  const selectionCandidate = isSelectable(eligible && (!titleBatch || (!!summary && f.selected === true)), judgedSelected, source.tier);
   // Scoring nominates a report; a completed identity/value decision admits it to selection.
   // A historical import already has its public decision. Preserve that confirmed state on rebuild.
   const selected = selectionCandidate && article.grouping_status === "complete"
@@ -265,7 +279,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const reason = selected ? pickString(f.reason, analysis?.reason_zh ?? null) : null;
   const hasXPost = !!article.x_post;
   const channel = channelOf(source.kind, hasXPost);
-  const bodyMode = bodyModeOf(source, article.body_status, !!article.body_text && article.body_text.length > 0);
+  const bodyMode = titleBatch || analysis?.batched_review ? "summary" : bodyModeOf(source, article.body_status, !!article.body_text && article.body_text.length > 0);
   const syndicate = mayRedistribute(source, bodyMode);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);
 
