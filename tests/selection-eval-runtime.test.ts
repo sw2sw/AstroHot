@@ -35,14 +35,14 @@ const row = (caseId: string, marker: string, tier: string, decision: "select" | 
 });
 
 interface Result {
-  meta: { split: string; promptVersion: string };
+  meta: { split: string; scope: "astro" | "ai4s"; promptVersion: string };
   model: string;
   reportPath: string;
   summary: { decisive: number; errors: number; accuracy: number; tokensIn: number; tokensOut: number };
   cases: Array<{ caseId: string; decision: string | null; error: string | null }>;
 }
 
-async function evaluate(rows: GoldRow[], providers: { prefilter: string; score: string }, opts: { split?: string } = {}): Promise<Result> {
+async function evaluate(rows: GoldRow[], providers: { prefilter: string; score: string }, opts: { split?: string; scope?: "astro" | "ai4s" } = {}): Promise<Result> {
   const dir = mkdtempSync(path.join(tmpdir(), "selection-eval-"));
   let reportPath: string | undefined;
   try {
@@ -50,6 +50,7 @@ async function evaluate(rows: GoldRow[], providers: { prefilter: string; score: 
     writeFileSync(gold, rows.map((item) => JSON.stringify(item)).join("\n"));
     const args = ["scripts/eval-selection.ts", "--gold", gold, "--concurrency", "6", "--no-import"];
     if (opts.split) args.push("--split", opts.split);
+    if (opts.scope) args.push("--scope", opts.scope);
     const { stdout } = await exec(process.execPath, args, {
       cwd: REPO_ROOT,
       env: {
@@ -67,7 +68,7 @@ async function evaluate(rows: GoldRow[], providers: { prefilter: string; score: 
     reportPath = stdout.split("\n").find((line) => line.startsWith("report: "))?.slice(8);
     assert.ok(reportPath, stdout);
     const report = JSON.parse(readFileSync(reportPath, "utf8")) as {
-      meta: { split: string; promptVersion: string };
+      meta: { split: string; scope: "astro" | "ai4s"; promptVersion: string };
       models: Record<string, { summary: Result["summary"]; cases: Result["cases"] }>;
     };
     const model = Object.keys(report.models)[0]!;
@@ -174,10 +175,13 @@ test("custom split names cannot escape the evaluation output directory", async (
 
     const marker = tag();
     const split = "../../../../outside";
-    const result = await evaluate([row(`${marker}-blocked`, marker, "T1", "reject", split)], { prefilter: prefilter.url, score: score.url }, { split });
-    assert.equal(path.dirname(result.reportPath), path.join(REPO_ROOT, ".data/eval"));
-    assert.ok(path.basename(result.reportPath).startsWith("selection-outside-1-"));
-    assert.equal(result.meta.split, split, "metadata keeps the original user-supplied split");
+    for (const scope of ["astro", "ai4s"] as const) {
+      const result = await evaluate([row(`${marker}-${scope}-blocked`, marker, "T1", "reject", split)], { prefilter: prefilter.url, score: score.url }, { split, scope });
+      assert.equal(path.dirname(result.reportPath), path.join(REPO_ROOT, ".data/eval"));
+      assert.ok(path.basename(result.reportPath).startsWith(`selection-${scope}-outside-1-`));
+      assert.equal(result.meta.scope, scope, "the report records its column");
+      assert.equal(result.meta.split, split, "metadata keeps the original user-supplied split");
+    }
     assert.equal(score.hits(), 0);
   });
 });
