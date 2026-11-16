@@ -1,5 +1,5 @@
 // The AI4S column's judging and public projection: its own prompts (never the astronomy ones),
-// scores only on full text, auto-selection off until an authorized calibration, AI4A only with
+// scores only on full text, an explicit off-switch fixture, AI4A only with
 // grounded original evidence, and a read layer isolated from the astronomy site. Cross-listing and
 // manual selection stay editorial overrides on the same identity. Synthetic scenarios on local stubs.
 import { stub, tag } from "./setup.ts";
@@ -15,6 +15,12 @@ import { loadItemDetail } from "@aihot/backend/publication/detail";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { overrideFields } from "@aihot/backend/admin/content";
 import { SELECTION } from "@aihot/industry/selection";
+
+// These scenarios exercise the off-switch AI4S policy. Set this file's fixtures to off explicitly,
+// then restore the configured value after the tests.
+const SELECTION_FIXTURE = SELECTION as { ai4sAutoSelection: boolean };
+const DEPLOYMENT_AI4S_AUTO_SELECTION = SELECTION_FIXTURE.ai4sAutoSelection;
+SELECTION_FIXTURE.ai4sAutoSelection = false;
 
 const T = tag();
 const AI4S_SOURCE = `test-ai4s-${T}`;
@@ -66,7 +72,10 @@ before(async () => {
     (${AI4S_SOURCE}, 'SYNTHETIC Science（测试）', 'rss', 'T1', 'editorial', '2100-01-01'),
     (${ASTRO_SOURCE}, '天文测试源', 'rss', 'T1', 'editorial', '2100-01-01')`;
 });
-after(async () => { await provider.close(); await stopBoss(); await closeDb(); });
+after(async () => {
+  SELECTION_FIXTURE.ai4sAutoSelection = DEPLOYMENT_AI4S_AUTO_SELECTION;
+  await provider.close(); await stopBoss(); await closeDb();
+});
 
 const article = async (marker: string, extra: Record<string, unknown> = {}) =>
   (await upsertMaterial({

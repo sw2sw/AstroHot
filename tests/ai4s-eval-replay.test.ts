@@ -1,7 +1,7 @@
 // R2 calibration harness replay: the shared eval script's --scope ai4s branch runs the example gold set
 // (industry/ai4s-gold.example.jsonl) end to end on a local fake model — no paid call. It proves the column's
 // own prompts are used (never the astronomy ones), the material gate leaves limited-coverage entries
-// unscored, and auto-selection stays off before calibration while the score still separates qualified
+// unscored, and enabled auto-selection follows the existing tier threshold while the score separates qualified
 // material from junk. The script runs as a child process so its own DB pool and module cache stay separate.
 import { stub } from "./setup.ts";
 import assert from "node:assert/strict";
@@ -41,7 +41,7 @@ function runEval(env: Record<string, string>): Promise<{ code: number; stdout: s
   });
 }
 
-test("eval-selection --scope ai4s replays the gold set on a fake model: column prompts, material gate, honest auto-off", async () => {
+test("eval-selection --scope ai4s replays the gold set on a fake model: column prompts, material gate, enabled selection", async () => {
   const { code, stdout, stderr } = await runEval({
     DATABASE_URL: process.env.DATABASE_URL!,
     DASHSCOPE_BASE_URL: `${provider.url}/v1`, ZHIPU_BASE_URL: `${provider.url}/v1`, DEEPSEEK_BASE_URL: `${provider.url}/v1`,
@@ -66,8 +66,8 @@ test("eval-selection --scope ai4s replays the gold set on a fake model: column p
   assert.equal(m.summary.n, 7);
   assert.equal(m.summary.either, 2, "the two synthetic limited-coverage entries are labelled 'either'");
   assert.equal(m.summary.errors, 0);
-  assert.deepEqual([m.summary.tp, m.summary.fp, m.summary.fn, m.summary.tn], [0, 0, 3, 2],
-    "auto-selection off: qualified material is not auto-selected (FN), junk is rejected (TN)");
+  assert.deepEqual([m.summary.tp, m.summary.fp, m.summary.fn, m.summary.tn], [3, 0, 0, 2],
+    "enabled auto-selection admits qualified full-text material (TP) and rejects junk (TN)");
 
   const byId = Object.fromEntries(m.cases.map((c: any) => [c.caseId, c]));
   assert.equal(byId["ai4s-syn-short-research"].score, null, "limited coverage is not scored");
@@ -75,7 +75,12 @@ test("eval-selection --scope ai4s replays the gold set on a fake model: column p
   assert.equal(byId["ai4s-syn-qualified"].score, 88);
   assert.equal(byId["ai4s-syn-strong-claim"].score, 30);
   assert.equal(byId["ai4s-syn-marketing"].relevance, "block");
-  assert.ok(m.cases.every((c: any) => c.decision === "reject"), "no ai4s case is auto-selected before calibration");
+  for (const id of ["ai4s-syn-qualified", "ai4s-syn-astro-ai4a", "ai4s-syn-standard-model"]) {
+    assert.equal(byId[id].decision, "select", `${id} passes the enabled threshold`);
+  }
+  for (const id of ["ai4s-syn-short-research", "ai4s-syn-short-community", "ai4s-syn-marketing", "ai4s-syn-strong-claim"]) {
+    assert.equal(byId[id].decision, "reject", `${id} is not selected`);
+  }
 
   const sweep60 = m.sweep.find((s: any) => s.t === 60);
   assert.equal(sweep60.F1, 1, "the score still separates qualified material from junk at the T1 threshold");

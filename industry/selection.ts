@@ -17,9 +17,10 @@ export const SELECTION = {
    */
   understandFloor: 50,
   /**
-   * AI4S 栏目（AI 赋能科学）的自动精选开关。未经主审授权的小样本校准之前默认关闭：
-   * 该栏目的资料照常评分、理解、结构化，但不自动进精选，只能由编辑人工精选（editorial_overrides.selected）。
+   * AI4S 栏目（AI 赋能科学）的自动精选开关：
+   * 该栏目的资料照常评分、理解、结构化，并按本文件保留的 tier 门槛自动进精选；
+   * 仍需通过原文引用、AI4A referent/discipline 与背景对照校验，未知保持 null。
    * 天文栏目不受此开关影响，仍按上面的门槛自动精选。
    */
-  ai4sAutoSelection: false,
+  ai4sAutoSelection: true,
 } as const;
