@@ -27,6 +27,39 @@ test("a direct astronomy application with a grounded quote and referent is verif
   assert.equal(finding(body, true, "AI classified 12 million galaxy spectra in the survey.", "astronomy-astrophysics", "galaxy spectra"), true);
 });
 
+const EHT_QUOTE = 'Our AI imaging method reconstructed EHT observations of M87 in a synthetic test.';
+
+test("a synthetic EHT observations of M87 quote retains the grounded AI4A finding", () => {
+  assert.equal(finding(EHT_QUOTE, true, EHT_QUOTE, "astronomy-astrophysics", "EHT observations of M87"), true);
+});
+
+for (const referent of ["EHT", "Event Horizon Telescope", "M87"]) {
+  test(`a grounded ${referent} application is recognized independently`, () => {
+    const body = `Our AI imaging method reconstructed ${referent} observations.`;
+    assert.equal(finding(body, true, body, "astronomy-astrophysics", referent), true);
+  });
+}
+
+for (const referent of ["M870", "XM87", "M87X", "M31", "XEHT", "EHTX", "EHT2", "preM87post"]) {
+  test(`lookalike ${referent} is not an astronomy referent`, () => {
+    const body = `AI reconstructed ${referent} observations.`;
+    assert.equal(finding(body, true, body, "astronomy-astrophysics", referent), null);
+  });
+}
+
+test("EHT and M87 do not bypass evidence, referent, discipline or background-foil guards", () => {
+  assert.equal(finding("An unrelated laboratory result.", true, EHT_QUOTE, "astronomy-astrophysics", "EHT observations of M87"), null);
+  assert.equal(finding(EHT_QUOTE, true, EHT_QUOTE, "astronomy-astrophysics", "Event Horizon Telescope"), null);
+  assert.equal(finding(EHT_QUOTE, true, EHT_QUOTE, "astronomy-astrophysics", null), null);
+  for (const domain of ["physics", "life-sciences", "chemistry", "materials", null]) {
+    assert.equal(finding(EHT_QUOTE, true, EHT_QUOTE, domain as never, "EHT observations of M87"), null);
+  }
+  const foil = "Unlike EHT observations of M87, our AI predicts protein folding.";
+  assert.equal(finding(foil, true, foil, "methods-tools", "EHT observations of M87"), null);
+  assert.equal(finding(EHT_QUOTE, null, EHT_QUOTE, "astronomy-astrophysics", "M87"), null);
+  assert.equal(finding(EHT_QUOTE, false, EHT_QUOTE, "astronomy-astrophysics", "M87"), false);
+});
+
 test("a verbatim physics quote that does not support an astronomy application stays null", () => {
   const body = "We present a candidate nonperturbative lattice definition of the Standard Model.";
   // The quote really is in the material, and the model claims applies=true with domain=physics — yet it

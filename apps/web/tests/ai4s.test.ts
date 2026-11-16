@@ -119,13 +119,24 @@ test("the AI4S detail intro is bilingual: Chinese beside the published original 
   assert.match(src, /item\.originalAbstractLabel/, "the detail passes the server's label instead of inventing one");
 });
 
-test("the AI4A badge appears only for a verified astronomy application; a score shows when present", async () => {
+test("the AI4A badge appears only for a verified astronomy application, and the astronomy domain is not printed twice beside it", async () => {
   const verified = await renderCard(item({ domain: "astronomy-astrophysics", ai4a: true, score: 85, accessNote: null }));
-  assert.match(verified, /天文相关/);
-  assert.match(verified, /天文与天体物理/);
+  assert.match(verified, /天文相关（AI4A）/);
+  assert.doesNotMatch(verified, /天文与天体物理/, "the badge already says the astronomy application; the domain label would repeat it");
   assert.match(verified, /85/);
   const unverified = await renderCard(item({ domain: "astronomy-astrophysics", ai4a: null }));
   assert.doesNotMatch(unverified, /天文相关/, "an ungrounded claim is not a verified astronomy application");
+  assert.match(unverified, /天文与天体物理/, "a domain chip on its own still shows");
+  const groundedOtherDomain = await renderCard(item({ domain: "methods-tools", ai4a: true }));
+  assert.match(groundedOtherDomain, /天文相关（AI4A）/);
+  assert.match(groundedOtherDomain, /科研方法与工具/, "a non-astronomy domain is a separate fact from the AI4A badge, so both stay");
+  const both = await renderCard(item({ domain: "physics", ai4a: true }));
+  assert.match(both, /天文相关（AI4A）/);
+  assert.match(both, /物理/);
+});
+test("the astronomy AI4A filter is labelled as the verified subset it is", () => {
+  const src = readFileSync(new URL("../app/routes/ai4s.tsx", import.meta.url), "utf8");
+  assert.match(src, /\{ key: "astro", label: "天文相关（AI4A）" \}/, "the filter names the AI4A subset, not a second discipline");
 });
 test("the list remembers which card opened an article, so closing it returns focus there", async () => {
   const src = readFileSync(new URL("../app/routes/ai4s.tsx", import.meta.url), "utf8");

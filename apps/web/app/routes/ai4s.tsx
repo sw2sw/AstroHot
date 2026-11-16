@@ -1,5 +1,5 @@
 // The AI4S column (AI 赋能科学): its own flat lists (精选 / 全部动态) and a discipline filter whose
-// "天文相关" entry is the verified AI4A subset. Reads the shared public API only; cards are text-first
+// "天文相关（AI4A）" entry is the verified AI4A subset. Reads the shared public API only; cards are text-first
 // (the column has no image permission), reuse the site's card density, math rendering and native detail
 // dialog, and state a limited intro's basis honestly instead of inventing a score or a full read. The
 // original link lives in the detail (the shared item page), not on the card. A light head check surfaces
@@ -108,6 +108,17 @@ function headPath(tab: "selected" | "all", domain: string | null) {
   return listPath("/api/site/ai4s", { tab: tab === "selected" ? "selected" : null, domain, page: null });
 }
 
+/**
+ * The domain chip of a card. A verified AI4A card already carries the 「天文相关（AI4A）」 badge;
+ * printing 天文与天体物理 beside it repeats the same fact in other words, so that one label is dropped
+ * for this combination. Every other domain still gets its own chip.
+ */
+function ai4sDomainLabel(item: Pick<Ai4sItemSummary, "ai4a" | "domain">): string | null {
+  if (!item.domain) return null;
+  if (item.ai4a === true && item.domain === "astronomy-astrophysics") return null;
+  return AI4S_DOMAIN_LABEL[item.domain] ?? item.domain;
+}
+
 /** One compact, text-first report. No image: the column holds no thumbnail permission. The original
  * link is in the detail (the shared item page), so the card carries no external anchor. */
 export function Ai4sCard({ item, read, onOpen, at }: { item: Ai4sItemSummary; read: boolean; onOpen: (id: string) => void; at: string }) {
@@ -141,10 +152,10 @@ export function Ai4sCard({ item, read, onOpen, at }: { item: Ai4sItemSummary; re
         {item.summary && <p className="mt-1 line-clamp-2 text-[14.5px] leading-[1.7] text-ink-3 lg:mt-2 lg:line-clamp-3 lg:text-[15px] lg:leading-[1.75]"><MathText text={item.summary} /></p>}
       </div>
 
-      {(item.ai4a === true || item.domain || item.accessNote) && (
+      {(item.ai4a === true || ai4sDomainLabel(item) || item.accessNote) && (
         <div className="relative z-10 mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-ink-4">
-          {item.ai4a === true && <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">天文相关</span>}
-          {item.domain && <span>{AI4S_DOMAIN_LABEL[item.domain] ?? item.domain}</span>}
+          {item.ai4a === true && <span className="rounded-full bg-accent/10 px-2 py-0.5 font-medium text-accent">天文相关（AI4A）</span>}
+          {ai4sDomainLabel(item) && <span>{ai4sDomainLabel(item)}</span>}
           {item.accessNote && <span className="text-note">{item.accessNote}</span>}
         </div>
       )}
@@ -246,7 +257,7 @@ export function Ai4sPageContent({ data }: { data: Ai4sFeedResponse }) {
     }
     return out;
   }, [view.items]);
-  const domainItems = [{ key: "all", label: "全部领域" }, { key: "astro", label: "天文相关" }, ...AI4S_DOMAINS.map((d) => ({ key: d.key as string, label: d.label }))];
+  const domainItems = [{ key: "all", label: "全部领域" }, { key: "astro", label: "天文相关（AI4A）" }, ...AI4S_DOMAINS.map((d) => ({ key: d.key as string, label: d.label }))];
   const updated = view.updatedAt ? beijingTime(view.updatedAt) : null;
   const resetKey = `${tab}|${domain ?? "all"}`;
 
