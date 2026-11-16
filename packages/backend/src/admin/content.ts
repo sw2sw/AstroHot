@@ -124,6 +124,12 @@ export async function setSeoIndexed(id: string, input: { indexed: boolean; reaso
   });
 }
 
+/**
+ * Manual corrections an editor may write. `crossListed` admits an AI4S finding into the astronomy column,
+ * and it is only meaningful with an astronomy review behind it: a verified AI4A finding, or the structured
+ * human determination below — a flag plus the reason it was made. The note is bounded and required: a bare
+ * boolean is not a review and cannot be audited.
+ */
 const FieldsSchema = z
   .object({
     title: z.string().min(1).max(300),
@@ -133,9 +139,26 @@ const FieldsSchema = z
     tags: z.array(z.string().max(60)).max(20),
     selected: z.boolean(),
     silent: z.boolean(),
+    crossListed: z.boolean(),
+    astroApproved: z.boolean(),
+    astroApprovalNote: z.string().trim().min(4).max(300),
   })
   .partial()
   .strict();
+
+/** A rejected correction: the caller sees why, not a silent no-op. */
+const rejected = (message: string) => Object.assign(new Error(message), { statusCode: 400 });
+
+/**
+ * Whether the article already carries a verified AI4A finding — the other door into astronomy. Read from
+ * the latest analysis that produced the publication, so a rejected or reverted finding does not count.
+ */
+async function hasVerifiedAi4a(id: string, tx: Tx): Promise<boolean> {
+  const [row] = await tx<{ ai4a: boolean }[]>`
+    SELECT coalesce((output->>'ai4a')::boolean, false) AS ai4a FROM analyses
+    WHERE article_id = ${id} ORDER BY created_at DESC, id DESC LIMIT 1`;
+  return row?.ai4a === true;
+}
 
 /** Manual corrections win over model output; `clear` removes a correction. */
 export async function overrideFields(id: string, input: { fields: unknown; clear?: string[]; reason: string; version: number }, actor: string) {
@@ -146,6 +169,24 @@ export async function overrideFields(id: string, input: { fields: unknown; clear
     if (before.version !== input.version) throw new Conflict(STALE);
     const next: Record<string, unknown> = { ...before.fields, ...fields };
     for (const k of input.clear ?? []) delete next[k];
+    // Cross-listing is an astronomy claim: it is refused when nothing supports it, rather than accepted
+    // and then quietly dropped by the publication projection (publish.ts re-checks the same condition).
+    // Turning it off retires the approval it was justified by, so a revoked decision leaves no stale
+    // approval behind for the next edit to inherit.
+    if (next.crossListed === false) {
+      delete next.astroApproved;
+      delete next.astroApprovalNote;
+    }
+    const note = typeof next.astroApprovalNote === "string" ? next.astroApprovalNote.trim() : "";
+    if (next.astroApproved === true && !note) throw rejected("人工天文认定需要填写认定理由（astroApprovalNote）");
+    const touchesApproval = fields.astroApproved !== undefined || fields.crossListed !== undefined
+      || (input.clear ?? []).some((k) => k === "astroApproved" || k === "crossListed");
+    if (touchesApproval && next.astroApproved === true && next.crossListed !== true) {
+      throw rejected("人工天文认定只能与交叉推荐（crossListed）同时提交");
+    }
+    if (fields.crossListed === true && !(next.astroApproved === true && note) && !(await hasVerifiedAi4a(id, tx))) {
+      throw rejected("交叉推荐需要已验证的 AI4A 结论，或带理由的人工天文认定（astroApproved + astroApprovalNote）");
+    }
     await tx`
       INSERT INTO editorial_overrides (article_id, fields, reason, version, updated_by) VALUES (${id}, ${tx.json(next as never)}, ${input.reason}, 1, ${actor})
       ON CONFLICT (article_id) DO UPDATE SET fields = EXCLUDED.fields, reason = EXCLUDED.reason, version = editorial_overrides.version + 1, updated_by = EXCLUDED.updated_by, updated_at = now()`;

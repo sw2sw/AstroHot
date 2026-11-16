@@ -426,6 +426,39 @@
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false
+    },
+    {
+      "id": "rss-ai4s-synthetic",
+      "name": "SYNTHETIC AI4S example (configure before use)",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://example.invalid/ai4s/rss.xml",
+        "allowCategories": [
+          "Science"
+        ],
+        "summaryIsBody": false,
+        "contentScope": "ai4s",
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 2,
+          "initialUrlAllowlist": [
+            "https://example.invalid/ai4s/research-demo",
+            "https://example.invalid/ai4s/community-demo"
+          ],
+          "initialNotBefore": "2026-01-01T00:00:00.000Z"
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": [
+        "SYNTHETIC",
+        "AI4S"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
     }
   ]
 }

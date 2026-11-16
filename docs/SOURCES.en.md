@@ -61,3 +61,10 @@ Before adding a source, check its terms and content scope. Use the admin preview
 5. Whether collection frequency, initial-fetch item count, and model budget suit your deployment.
 
 See [Operating Cadence](CADENCE.en.md), [Admin Settings](ADMIN.en.md), and [Content-rights Verification Method](CONTENT-RIGHTS.en.md).
+
+
+## Manually classified article ingestion
+
+An authorized editor or agent reads the material first, then uses the existing `POST /api/ingest/items` endpoint with `contentScope: "astro" | "ai4s"` and a nonempty `scopeReason` (up to 1,000 characters) on each `items[]` entry. Classification and publisher identity are independent: preserve the real `sourceId`, original URL and publication date, rather than creating a fictitious column-specific publisher. Omitted scope uses the source configuration, falling back to `astro`. Existing Bearer authentication, rate limits, source permissions and budgets remain unchanged. New sources remain isolated; a scope choice does not grant publication, selection, AI4A or astronomy cross-list approval.
+
+Replaying identical content at the same URL creates no new identity or analysis. An explicit scope conflicting with an existing identity returns 409 and rolls back that item's material and provenance changes; classification correction needs a separate review. Batches retain per-item commit semantics: earlier entries can have succeeded when a later entry fails, so reconcile results before safe replay. Only the first normalized URL in a batch is processed. Do not use this entrance to rerun historical analysis or invent publication dates.

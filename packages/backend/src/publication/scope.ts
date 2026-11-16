@@ -13,19 +13,36 @@ export function releasedCondition(now: Date) {
   return sql`(NOT p.selected OR p.visible_after <= ${now})`;
 }
 
+/**
+ * Astronomy surfaces list astronomy material, plus any AI4S row an editor explicitly cross-listed.
+ * The AI4S column has its own predicates below; the two never read each other's rows by accident.
+ */
+export function astroScopeCondition() {
+  return sql`(p.content_scope = 'astro' OR p.astro_cross_listed)`;
+}
+
+/**
+ * Heat/signal evidence is astronomy material too. Signals can exist before a publication does, so the
+ * scope is keyed on the article (always present, default astro); an AI4S article counts only once an
+ * editor cross-listed it. `a` is articles, `p` the left-joined publication.
+ */
+export function astroSignalScopeCondition() {
+  return sql`(a.content_scope = 'astro' OR coalesce(p.astro_cross_listed, false))`;
+}
+
 /** Listed on public surfaces at `now`: public, pool eligible, and released by then. */
 export function listedCondition(now: Date) {
-  return sql`p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)}`;
+  return sql`p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)} AND ${astroScopeCondition()}`;
 }
 
 /** Story reports include older editorial material outside the pool, but never withdrawn or not yet released content. */
 export function storyReportCondition(now: Date) {
-  return sql`p.visibility = 'public' AND s.participation_mode = 'editorial' AND ${releasedCondition(now)}`;
+  return sql`p.visibility = 'public' AND s.participation_mode = 'editorial' AND ${releasedCondition(now)} AND ${astroScopeCondition()}`;
 }
 
 /** Selected set as the website shows it (home timeline, reading groups, topics): every selected report. */
 export function selectedCondition(now: Date) {
-  return sql`p.visibility = 'public' AND p.selected AND p.visible_after <= ${now}`;
+  return sql`p.visibility = 'public' AND p.selected AND p.visible_after <= ${now} AND ${astroScopeCondition()}`;
 }
 
 /**
@@ -33,7 +50,17 @@ export function selectedCondition(now: Date) {
  * representative (publish.ts settleSeats).
  */
 export function seatedCondition(now: Date) {
-  return sql`p.visibility = 'public' AND p.selected AND p.seat AND p.visible_after <= ${now}`;
+  return sql`p.visibility = 'public' AND p.selected AND p.seat AND p.visible_after <= ${now} AND ${astroScopeCondition()}`;
+}
+
+/** The AI4S column's own listed set: its rows only, public, eligible and released. */
+export function ai4sListedCondition(now: Date) {
+  return sql`p.content_scope = 'ai4s' AND p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)}`;
+}
+
+/** The AI4S column's own selected set (manual overrides while auto-selection is off). */
+export function ai4sSelectedCondition(now: Date) {
+  return sql`p.content_scope = 'ai4s' AND p.visibility = 'public' AND p.selected AND p.visible_after <= ${now}`;
 }
 
 /** The report was published from a composite (multi-topic) analysis: it only mentions facts. */

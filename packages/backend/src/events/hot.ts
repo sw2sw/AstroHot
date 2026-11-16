@@ -3,7 +3,7 @@
 // 24-hour half-life, and the source time (not collection time) places evidence in the window.
 import { sql, type Db } from "../db.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "../publication/representative.ts";
-import { evidenceCondition, listedCondition } from "../publication/scope.ts";
+import { astroSignalScopeCondition, evidenceCondition, listedCondition } from "../publication/scope.ts";
 
 /** One entry of a stored ranking; the public read layer (publication/hot.ts) re-checks it before showing it. */
 export interface HotEntry {
@@ -119,6 +119,7 @@ export const currentSignals = () => sql`(
   FROM story_signals ss JOIN articles a ON a.id = ss.article_id JOIN sources s ON s.id = a.source_id
   LEFT JOIN publications p ON p.article_id = ss.article_id
   WHERE s.participation_mode <> 'isolated' AND coalesce(p.visibility, 'public') <> 'withdrawn'
+    AND ${astroSignalScopeCondition()}
     AND NOT EXISTS (SELECT 1 FROM grouping_overrides go WHERE go.article_id = ss.article_id AND go.mode = 'standalone')
     AND (s.participation_mode <> 'editorial' OR EXISTS (SELECT 1 FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id
       WHERE fa.article_id = ss.article_id AND f.story_id = ss.story_id AND ${evidenceCondition()}))

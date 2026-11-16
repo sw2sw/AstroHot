@@ -4,6 +4,9 @@
 // decision. A threshold sweep shows what another threshold would have done. The format of the gold file
 // is in docs/SCORING.md (industry/gold.example.jsonl has two made-up cases).
 // Usage: node --env-file=.env scripts/eval-selection.ts --gold .data/gold.jsonl [--models default,deepseek-flash] [--n 200] [--label "..."]
+//   --scope ai4s routes the prefilter/score prompts to the AI4S column set (industry/ai4s-gold.example.jsonl);
+//   an AI4S case scores only with sufficient material (full text or a substantive limited abstract);
+//   thin teasers stay "待评" (score null), and limited-material input discloses that full text was not read.
 // Receipts make re-runs free; "either" cases are excluded from decisive metrics. Each run is also
 // imported into SelectBench (admin → SelectBench) with every case, unless --no-import is given.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -13,6 +16,7 @@ import { REPO_ROOT } from "@aihot/backend/config";
 import { closeDb, sql } from "@aihot/backend/db";
 import {
   SELECTION_PROMPT_VERSION,
+  AI4S_PROMPT_VERSIONS,
   buildScoreInput,
   normalizeAnalysis,
   runSelectionPrefilter,
@@ -34,12 +38,15 @@ const { values } = parseArgs({
     seed: { type: "string", default: "7" },
     label: { type: "string" },
     "no-import": { type: "boolean", default: false },
+    scope: { type: "string", default: "astro" },
   },
 });
+if (values.scope !== "astro" && values.scope !== "ai4s") throw new Error("--scope must be astro or ai4s");
+const scope = values.scope as "astro" | "ai4s";
 
 interface GoldRow {
   caseId: string;
-  material: { title: string; originalTitle: string | null; publishedAt: string | null; sourceName: string; bodyZh: string | null; bodyOriginal: string | null };
+  material: { title: string; originalTitle: string | null; publishedAt: string | null; sourceName: string; bodyZh: string | null; bodyOriginal: string | null; coverage?: string | null };
   sourceFacts: { sourceKind: string; sourceTier?: string; firstParty?: boolean; language?: string | null };
   /** Optional: a split (e.g. development / holdout) and a stratum for reading the mistakes. */
   samplingContext?: { benchmarkSplit?: string; samplingStratum?: string };
@@ -76,6 +83,8 @@ function toInput(r: GoldRow): AnalyzeInputArticle {
     xPost: isX ? { authorName: m.sourceName, handle: "", text: body ?? m.title } : null,
     media: [],
     source: { name: m.sourceName, kind: r.sourceFacts.sourceKind, tier: r.sourceFacts.sourceTier ?? "T2", firstParty: r.sourceFacts.firstParty ?? false },
+    contentScope: scope,
+    coverage: m.coverage ?? null,
   };
 }
 
@@ -130,13 +139,13 @@ for (const model of models) {
       const prefilter = await runSelectionPrefilter(input, {}, (id) => receiptIds.push(id));
       if (prefilter.label === "BLOCK") {
         const run: AnalysisRun = { prefilter, scores: null, writing: null, structure: null };
-        return { r, out: normalizeAnalysis(run), receiptIds, error: null as string | null };
+        return { r, out: normalizeAnalysis(run, scope), receiptIds, error: null as string | null };
       }
 
       const threshold = tierThreshold(input.source.tier);
       if (threshold === null) {
         const run: AnalysisRun = { prefilter, scores: null, writing: null, structure: null };
-        return { r, out: normalizeAnalysis(run), receiptIds, error: null as string | null };
+        return { r, out: normalizeAnalysis(run, scope), receiptIds, error: null as string | null };
       }
 
       const key = buildScoreInput(input);
@@ -156,7 +165,7 @@ for (const model of models) {
       // Model output is independent of source tier; the decision threshold is not.
       const scores = shared.scores ? { ...shared.scores, threshold } : null;
       const run: AnalysisRun = { prefilter, scores, writing: null, structure: null };
-      return { r, out: normalizeAnalysis(run), receiptIds, error: null as string | null };
+      return { r, out: normalizeAnalysis(run, scope), receiptIds, error: null as string | null };
     } catch (error) {
       return { r, out: null, receiptIds, error: String(error).slice(0, 200) };
     }
@@ -219,12 +228,12 @@ for (const model of models) {
 const outDir = path.join(REPO_ROOT, ".data/eval");
 mkdirSync(outDir, { recursive: true });
 const splitName = safeReportNamePart(values.split!);
-const file = path.join(outDir, `selection-${splitName}-${sample.length}-${Date.now()}.json`);
-const meta = { split: values.split, n: sample.length, seed: Number(values.seed), promptVersion: SELECTION_PROMPT_VERSION, createdAt: new Date().toISOString() };
+const file = path.join(outDir, `selection-${scope}-${splitName}-${sample.length}-${Date.now()}.json`);
+const meta = { split: values.split, scope, n: sample.length, seed: Number(values.seed), promptVersion: scope === "ai4s" ? [AI4S_PROMPT_VERSIONS.prefilter, AI4S_PROMPT_VERSIONS.score].join("+") : SELECTION_PROMPT_VERSION, createdAt: new Date().toISOString() };
 writeFileSync(file, JSON.stringify({ meta, models: report }, null, 2));
 console.log(`report: ${file}`);
 if (!values["no-import"]) {
-  const run = await importSelectBenchRun({ meta, models: report }, values.label ?? `${values.split} ${sample.length} 条 · ${Object.keys(report).join(" / ")}`, "script:eval-selection");
+  const run = await importSelectBenchRun({ meta, models: report }, values.label ?? `${scope} · ${values.split} ${sample.length} 条 · ${Object.keys(report).join(" / ")}`, "script:eval-selection");
   console.log(`SelectBench run: ${run.id}`);
 }
 await closeDb();

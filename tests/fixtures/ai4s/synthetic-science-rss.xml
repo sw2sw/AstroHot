@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Entirely project-authored synthetic test data; no real feed excerpts. -->
+<rss version="2.0"><channel><title>SYNTHETIC Science</title><link>https://example.invalid/ai4s/rss.xml</link><description>Authored offline test fixture</description>
+<item><title>SYNTHETIC: A toy research workflow</title><description>SYNTHETIC: A fictional team discusses a toy research idea with an AI assistant. Technical details are not available.</description><link>https://example.invalid/ai4s/research-demo</link><guid>https://example.invalid/ai4s/research-demo</guid><category>Science</category><pubDate>Sun, 15 Nov 2026 22:00:01 GMT</pubDate></item>
+<item><title>SYNTHETIC: A fictional research community bulletin</title><description>SYNTHETIC: A fictional science community has a new discussion space. Technical details are not available.</description><link>https://example.invalid/ai4s/community-demo</link><guid>https://example.invalid/ai4s/community-demo</guid><category>Science</category><pubDate>Sun, 15 Nov 2026 22:00:00 GMT</pubDate></item>
+<item><title>SYNTHETIC: An excluded category notice</title><description>SYNTHETIC: This invented notice checks that unrelated categories are excluded from the Science-only demonstration feed.</description><link>https://example.invalid/ai4s/excluded-demo</link><guid>https://example.invalid/ai4s/excluded-demo</guid><category>Research</category><pubDate>Mon, 26 Oct 2026 14:30:00 GMT</pubDate></item>
+</channel></rss>

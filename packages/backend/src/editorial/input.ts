@@ -43,6 +43,8 @@ export interface AnalyzeInputArticle {
   };
   /** Stored Chinese translation of the body (e.g. a full post whose original was truncated). */
   translationZh?: string | null;
+  /** Which column the material belongs to (articles.content_scope): "astro" or "ai4s". */
+  contentScope?: string;
 }
 
 /**
@@ -62,10 +64,10 @@ export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputA
     raw: { datePrecision?: string; categories?: string[] } | null;
     x_post: Record<string, any> | null; x_article: { title?: string; text?: string } | null;
     media: Array<Record<string, any>>; source_name: string; source_kind: string; tier: string; first_party: boolean; source_tags: string[]; owner_entity_id: string | null;
-    config: Record<string, any>; translation_zh: string | null;
+    config: Record<string, any>; translation_zh: string | null; content_scope: string;
   }[]>`
     SELECT a.id, a.revision, a.title, a.url, a.author, a.published_at, a.discovered_at, a.body_text, a.excerpt, a.body_status, a.coverage, a.access, a.raw,
-           a.x_post, a.x_article, a.media,
+           a.x_post, a.x_article, a.media, a.content_scope,
            s.name AS source_name, s.kind AS source_kind, s.tier, s.first_party, s.tags AS source_tags, s.owner_entity_id, s.config,
            tr.body_text AS translation_zh
     FROM articles a JOIN sources s ON s.id = a.source_id
@@ -82,6 +84,7 @@ export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputA
       fetchesBody: row.config?.fetchPublicContent === true || !!row.config?.detail || row.source_kind === "web_list",
     },
     translationZh: row.translation_zh,
+    contentScope: row.content_scope,
   };
 }
 

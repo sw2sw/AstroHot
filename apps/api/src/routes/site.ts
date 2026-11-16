@@ -7,6 +7,7 @@ import type { ReportIndexResponse, ReportLatestPage, ReportNavigationResponse, S
 import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
+import { loadAi4sFeed, parseAi4sQuery } from "@aihot/backend/publication/ai4s";
 import { loadObservingGuides } from "@aihot/backend/publication/observing-guides";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
@@ -98,6 +99,17 @@ export function registerSite(app: FastifyInstance) {
     const search = q.q?.trim() ? q.q.trim().slice(0, 200) : null;
     const tab = q.tab === "relevance" ? "relevance" : "time";
     return sendJsonWithEtag(req, reply, await loadPool({ ...filters, q: search, tab, page }), { etagPrefix: "pool", cacheControl: "public, max-age=60, s-maxage=60" });
+  }));
+
+  app.get("/api/site/ai4s", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    let query;
+    try {
+      query = parseAi4sQuery(q);
+    } catch (error) {
+      throw new BadRequest((error as Error).message);
+    }
+    return sendJsonWithEtag(req, reply, await loadAi4sFeed(query), { etagPrefix: "ai4s", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/items/:id", siteHandler(async (req, reply) => {

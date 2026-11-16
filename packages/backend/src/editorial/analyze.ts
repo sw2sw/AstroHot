@@ -12,6 +12,7 @@ import { CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { beijingDate } from "@aihot/contracts/time";
 import { CATEGORIES } from "@aihot/industry/taxonomy";
 import { SELECTION } from "@aihot/industry/selection";
+import { AI4S_DOMAINS, AI4S_DOMAIN_KEYS } from "@aihot/industry/ai4s";
 import { sql } from "../db.ts";
 import { chatJson, MODELS, ModelOutputError, type ContentPart } from "../providers/llm.ts";
 import { completeReceipt, ProviderRejectedError, ReceiptUnknownError } from "../providers/receipts.ts";
@@ -22,7 +23,7 @@ import { pageFetchable } from "../content/extract.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import {
   buildArticlePrompt, buildLongTweetPrompt, buildShortTweetPrompt, finalizeCopy, isShortTweetInput, looksZh, materialHeading, MAX_BODY_CHARS, missingEvidence,
-  needsShortTweetTranslation, parseTranslateOutput, PREFILTER_SYSTEM, prefilterUser, translateInputOf, UNDERSTAND_SYSTEM, understandUser,
+  needsShortTweetTranslation, parseTranslateOutput, PREFILTER_SYSTEM, prefilterUser, translateInputOf, AI4S_UNDERSTAND_SYSTEM, UNDERSTAND_SYSTEM, understandUser,
   type IdentityGuard,
 } from "./writing.ts";
 import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, normalizeTags, TOPIC_TAGS } from "./vocabulary.ts";
@@ -42,6 +43,21 @@ export const PROMPT_VERSIONS = {
 /** Every step's prompt, as stored on each judgement. */
 export const SELECTION_PROMPT_VERSION = [PROMPT_VERSIONS.prefilter, PROMPT_VERSIONS.score].join("+");
 export const ANALYZE_PROMPT_VERSION = Object.values(PROMPT_VERSIONS).join("+");
+
+// The AI4S column judges with its own prefilter, score and structure prompts, and writes under its own
+// discipline-neutral understand/summarize prompts (the shared astronomy ones force astronomy translations
+// that would misrender life-science/materials material). Versions stay separate so an AI4S receipt never
+// collides with an astronomy one, and the astronomy versions are left untouched.
+export const AI4S_PROMPT_VERSIONS = {
+  prefilter: promptVersion("ai4s-prefilter"),
+  score: promptVersion("ai4s-selection-score"),
+  structure: promptVersion("ai4s-structure"),
+  understand: promptVersion("ai4s-understand"),
+  summarize: promptVersion("ai4s-summarize-article", "summarize-article-empty", "identity-context"),
+} as const;
+export const AI4S_ANALYZE_PROMPT_VERSION = [
+  AI4S_PROMPT_VERSIONS.prefilter, AI4S_PROMPT_VERSIONS.score, AI4S_PROMPT_VERSIONS.understand, AI4S_PROMPT_VERSIONS.summarize, AI4S_PROMPT_VERSIONS.structure,
+].join("+");
 
 // Scoring
 
@@ -70,6 +86,10 @@ const scoreCall = (model: string) => SCORE_CALL[model] ?? { temperature: 0.2, ma
 
 /** The score prompt: the industry's taste (industry/prompts/selection-score.md). */
 export const SCORE_SYSTEM = promptText("selection-score");
+
+/** The AI4S column's prefilter and score prompts (industry/prompts/ai4s-*.md). */
+export const AI4S_PREFILTER_SYSTEM = promptText("ai4s-prefilter");
+export const AI4S_SCORE_SYSTEM = promptText("ai4s-selection-score");
 
 export const ScoreSchema = z.object({ attentionScore: z.coerce.number().int().min(0).max(100) });
 
@@ -106,6 +126,8 @@ export function buildScoreInput(a: AnalyzeInputArticle): string {
     "请按系统规则评估以下单篇材料所代表的事件。只输出 attentionScore。",
     `【发布时间（北京时间）】\n${when}`,
     `【标题】\n${a.title.trim()}`,
+    // A sufficient abstract is scored, but the request states plainly that the full text was not read.
+    ...(a.contentScope === "ai4s" && a.coverage !== "full_text" ? ["【评分范围】本条未阅读全文，仅依据上述官方摘要/公开片段评分；只按材料能证明的范围打分，不把摘要外的想象当证据。"] : []),
     `【${heading}】\n${body.length > MAX_BODY_CHARS ? body.slice(0, MAX_BODY_CHARS) : body}`,
   ].join("\n\n");
 }
@@ -139,6 +161,20 @@ export const StructureSchema = z.object({
   category: z.enum(CATEGORY_KEYS).nullable().catch(null),
   tags: z.array(z.string()).max(12).catch([]),
   subjects: z.array(z.string()).max(6).catch([]),
+  fact: FactSchema,
+});
+
+/** The AI4S structure step: a discipline domain and an evidence-backed AI4A finding, no astronomy category/tags. */
+export const Ai4sStructureSchema = z.object({
+  scope: z.enum(["single", "composite", "unknown"]).catch("unknown"),
+  domain: z.enum(AI4S_DOMAIN_KEYS).nullable().catch(null),
+  astroApplication: z.object({
+    applies: z.boolean().nullable().catch(null),
+    evidence: z.string().trim().max(600).nullable().catch(null),
+    // The specific astronomy object, facility, survey or data product the AI was applied to, copied from
+    // the evidence. A method word ("spectra") is not a referent; the gate checks it is in the quote.
+    referent: z.string().trim().max(80).nullable().catch(null),
+  }).nullable().catch(null),
   fact: FactSchema,
 });
 
@@ -196,6 +232,64 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
   };
 }
 
+/** The AI4S structure prompt, filled from the column's discipline domains. */
+export const AI4S_STRUCTURE_SYSTEM = promptText("ai4s-structure", {
+  domainCount: ZH_COUNT[AI4S_DOMAINS.length] ?? String(AI4S_DOMAINS.length),
+  domainGuide: AI4S_DOMAINS.map((d) => `- ${d.key}（${d.label}）：${d.guide}`).join("\n"),
+});
+
+// AI4A is a claim the model makes; this is a structural consistency gate, not a scientific verification.
+// Three things must agree before the finding stands: the discipline the model assigned, the specific
+// object it says the AI was applied to, and the verbatim quote it supplies. A quote that bears no
+// astronomy application — a pure physics result, a laboratory measurement, astronomy named only as a
+// background foil — cannot support the claim, so the finding stays null.
+//
+// The referent vocabulary names celestial objects, astronomy facilities, surveys and data products only.
+// Measurement methods are deliberately absent: "spectra", "spectral", "photometric", "spectroscopic" and
+// "interferometer" describe laboratory work just as well, so their presence alone proves nothing.
+const ASTRO_EN = ["galaxy", "galaxies", "stellar", "star", "stars", "exoplanet", "supernova", "pulsar", "nebula", "asteroid", "comet", "telescope", "observatory", "redshift", "cosmic microwave", "gravitational wave", "black hole", "neutron star", "dark matter", "dark energy", "sky survey", "coronagraph", "light curve", "radial velocity", "astrometr", "cosmolog", "astrophys", "astronomical", "astronomy", "jwst", "hubble", "alma", "chandra", "fermi", "tess", "euclid", "rubin", "lsst", "sdss", "gaia", "kepler"];
+const ASTRO_ZH = ["星系", "恒星", "系外行星", "超新星", "脉冲星", "星云", "小行星", "彗星", "望远镜", "天文台", "红移", "巡天", "引力波", "黑洞", "中子星", "暗物质", "暗能量", "宇宙微波背景", "天体", "天文", "光变", "视向速度", "天体测量", "宇宙学"];
+const astroPresent = (text: string) => new RegExp(`\\b(?:${ASTRO_EN.join("|")})\\b`, "i").test(text) || ASTRO_ZH.some((t) => text.includes(t));
+const BACKGROUND_FOIL = /\b(?:unlike|rather than|compared (?:to|with)|in contrast (?:to|with)|instead of|as opposed to)\s+[^,.;]*|(?:不同于|而非|而不是|相较于|相比|有别于)[^，。；,.;]*/gi;
+/** The quote must still name an astronomy application after background/contrast foils are removed. */
+function supportsAstronomyApplication(evidence: string): boolean {
+  return astroPresent(evidence) && astroPresent(evidence.replace(BACKGROUND_FOIL, " "));
+}
+/**
+ * The discipline must be consistent with the claim: a work whose own domain is an astronomy or a
+ * general research-method one can support an astronomy application; a life-sciences, chemistry or
+ * materials finding that claims one is a contradiction the pipeline cannot resolve, so it is null and
+ * stays available for a human astronomy determination (an audited override), never a silent pass.
+ */
+const AI4A_DOMAINS = new Set<string>(["astronomy-astrophysics", "methods-tools"]);
+
+/**
+ * The AI4S structure: the same grounding guard as the astronomy site for the fact, plus a discipline
+ * domain and an AI4A finding. AI4A is true only when all of these hold: the model claims an astronomy
+ * application; its quote is present verbatim in the original material; the quote names a specific
+ * astronomy object or facility, not only a measurement method or a background foil; the model names that
+ * same object as the referent; and the assigned domain is consistent with an astronomy application.
+ * Anything else is null (unknown), not false — and never a claim of scientific verification.
+ */
+export function normalizeAi4sStructure(data: z.infer<typeof Ai4sStructureSchema>, a: AnalyzeInputArticle) {
+  const base = normalizeStructure({ scope: data.scope, category: null, tags: [], subjects: [], fact: data.fact }, a);
+  const visible = collapseWhitespace(buildMaterial(a));
+  const originals = (a.xPost
+    ? [String(a.xPost.text ?? a.title), String(a.xPost.quoted?.text ?? "")]
+    : [a.bodyText ?? a.excerpt ?? ""]).map(collapseWhitespace);
+  const evidence = collapseWhitespace(data.astroApplication?.evidence ?? "");
+  const grounded = !!evidence && visible.includes(evidence) && originals.some((original) => original.includes(evidence));
+  const applies = data.astroApplication?.applies ?? null;
+  const referent = collapseWhitespace(data.astroApplication?.referent ?? "");
+  // The referent the model names must be in its own quote and must itself be an astronomy referent.
+  const referentGrounded = !!referent && astroPresent(referent) && evidence.includes(referent);
+  const domainConsistent = data.domain !== null && AI4A_DOMAINS.has(data.domain);
+  const ai4a = applies === true
+    ? (grounded && referentGrounded && domainConsistent && supportsAstronomyApplication(evidence) ? true : null)
+    : applies === false ? false : null;
+  return { ...base, domain: data.domain, ai4a };
+}
+
 export interface AnalysisRun {
   prefilter: { label: "PASS" | "BLOCK" | "UNKNOWN"; reason: string; model: string; receiptId: number; reused: boolean };
   /**
@@ -217,7 +311,7 @@ export interface AnalysisRun {
     receiptIds: number[];
     reused: boolean;
   } | null;
-  structure: (ReturnType<typeof normalizeStructure> & { model: string; receiptId: number; reused: boolean }) | null;
+  structure: (ReturnType<typeof normalizeStructure> & { domain?: string | null; ai4a?: boolean | null; model: string; receiptId: number; reused: boolean }) | null;
 }
 
 const isContentFilter = (error: unknown) => error instanceof ProviderRejectedError && !error.retryable && /contentFilter|"1301"/.test(error.message);
@@ -244,12 +338,13 @@ const tagged = (attemptTag: string | undefined, step: string) => [attemptTag, st
 async function runPrefilter(a: AnalyzeInputArticle, opts: StepOpts): Promise<AnalysisRun["prefilter"]> {
   const model = await modelFor("prefilter");
   checkAnalysisRunning();
+  const ai4s = a.contentScope === "ai4s";
   const res = await chatJson({
     model,
     purpose: "prefilter_article",
     subject: subjectOf(a),
-    promptVersion: PROMPT_VERSIONS.prefilter,
-    system: PREFILTER_SYSTEM,
+    promptVersion: ai4s ? AI4S_PROMPT_VERSIONS.prefilter : PROMPT_VERSIONS.prefilter,
+    system: ai4s ? AI4S_PREFILTER_SYSTEM : PREFILTER_SYSTEM,
     user: prefilterUser(a),
     schema: PrefilterSchema,
     temperature: 0,
@@ -287,6 +382,7 @@ async function runScores(
   const model = opts.scoreModel ?? (await modelFor("score"));
   const call = scoreCall(model);
   const input = buildScoreInput(a);
+  const ai4s = a.contentScope === "ai4s";
   const values: number[] = [];
   const receiptIds: number[] = [];
   let reused = true;
@@ -295,7 +391,7 @@ async function runScores(
     checkAnalysisRunning();
     try {
       const res = await chatJson({
-        model, purpose: "score_article", subject: subjectOf(a), promptVersion: PROMPT_VERSIONS.score, system: SCORE_SYSTEM, user: input,
+        model, purpose: "score_article", subject: subjectOf(a), promptVersion: ai4s ? AI4S_PROMPT_VERSIONS.score : PROMPT_VERSIONS.score, system: ai4s ? AI4S_SCORE_SYSTEM : SCORE_SYSTEM, user: input,
         schema: ScoreSchema, temperature: call.temperature, maxTokens: call.maxTokens, timeoutMs: call.timeoutMs,
         // Each call is its own paid request; an explicit re-evaluation gets new ones.
         attemptTag: tagged(opts.attemptTag, `score-${i + 1}`),
@@ -315,12 +411,53 @@ async function runScores(
   return { model, threshold, values, receiptIds, reused };
 }
 
+/** A result that is only promised, planned or still to come is not a stated result. */
+const PLANNED = /\b(?:plan|plans|planned|planning|will|would|aim|aims|intend|intends|upcoming|forthcoming|expect|expects|expected|hope|hopes|soon|future)\b|计划|拟|将(?:于|在|会|来)|预计|有望|即将|后续|未來|未来/i;
+/** Text that says the result is not there yet never becomes a result by being written down. */
+const WITHHELD = /\b(?:not (?:yet )?available|no results?|results? (?:are|is|were) not|not (?:yet )?released|to be (?:published|released)|coming soon)\b|尚未|暂未|待公布|无结果|暂无|未能提供|结果未/i;
+/** A concrete finding: a number with a unit, a share, a factor or a significance. */
+const QUANTITY = /\d+(?:\.\d+)?\s*(?:%|percent|fold|×|x\b|σ|sigma|nm|μm|µm|mm|cm|km|eV|keV|MeV|GeV|TeV|Hz|kHz|MHz|GHz|ms|s\b|million|billion|thousand|万|亿)/i;
+/** Verbs that state an action taken on an object (never a bare "we are working on it"). */
+const RESULT_VERB = /\b(?:release[ds]?|reduc\w+|improv\w+|prov\w+|measur\w+|classif\w+|predict\w+|achiev\w+|outperform\w+|validat\w+|demonstrat\w+|report\w+|observ\w+|detect\w+|increas\w+|decreas\w+|enable[ds]?|identif\w+|benchmark\w*|found|finds|show\w*|estimat\w+|deriv\w+|refin\w+)\b/i;
+const contentTokens = (s: string) => s.split(/\s+/).filter((t) => /[A-Za-z0-9\u4e00-\u9fff]/.test(t)).length;
+/** Chinese has no word breaks: an action verb plus a clause long enough to carry an object. */
+const ZH_RESULT = /(发布|提出|证明|测量|分类|预测|实现|提升|降低|减少|增加|验证|观测|探测|发现|公开|基准|估计|推导|改进|识别|重建|标定)/;
+const statesResult = (s: string): boolean => {
+  if (QUANTITY.test(s)) return true;
+  if (RESULT_VERB.test(s) && contentTokens(s) >= 6) return true;
+  return ZH_RESULT.test(s) && s.replace(/\s+/g, "").length >= 12;
+};
+
+/**
+ * Whether an AI4S limited intro carries enough substance to score. Coverage type is not material
+ * sufficiency, and neither is length: a one-line teaser or a blog description cannot support an attention
+ * judgment, while one sentence stating a concrete result can. This is a substance floor, not a reading of
+ * the science: the text must say what was done or found, and announcing, planned or explicitly withheld
+ * results do not count, in however many sentences they are wrapped.
+ */
+export function ai4sMaterialSufficient(a: AnalyzeInputArticle): boolean {
+  if (a.coverage === "full_text") return true;
+  if (a.coverage === "metadata_only") return false;
+  const text = collapseWhitespace(a.bodyText ?? a.excerpt ?? "");
+  if (!text) return false;
+  const sentences = text.split(/[.!?。！？]+/).map((s) => s.trim()).filter(Boolean);
+  // A planned, forthcoming or explicitly withheld result is not a result, whatever surrounds it.
+  const stated = sentences.filter((s) => !PLANNED.test(s) && !WITHHELD.test(s));
+  if (!stated.length) return false;
+  // A quantitative finding stands on its own; a qualitative one must name an action on a concrete object.
+  return stated.some(statesResult);
+}
+
 /** The production score step; its threshold stays case-specific even when an evaluator shares model output. */
 export async function runSelectionScores(
   a: AnalyzeInputArticle,
   opts: StepOpts = {},
   onReceipt?: ReceiptObserver,
 ): Promise<AnalysisRun["scores"]> {
+  // The AI4S column scores material that supports an attention judgment: confirmed full text, or a
+  // sufficient official abstract scored within its proven range. A thin teaser carries no score and
+  // cannot be auto-selected; auto-selection itself stays off until an authorized calibration.
+  if (a.contentScope === "ai4s" && !ai4sMaterialSufficient(a)) return null;
   const threshold = tierThreshold(a.source.tier);
   return threshold === null ? null : runScores(a, threshold, opts, onReceipt);
 }
@@ -328,6 +465,21 @@ export async function runSelectionScores(
 export async function runStructure(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<NonNullable<AnalysisRun["structure"]>> {
   const model = await modelFor("structure");
   checkAnalysisRunning();
+  if (a.contentScope === "ai4s") {
+    const res = await chatJson({
+      model,
+      purpose: "structure_article",
+      subject: subjectOf(a),
+      promptVersion: AI4S_PROMPT_VERSIONS.structure,
+      system: AI4S_STRUCTURE_SYSTEM,
+      user: buildMaterial(a),
+      schema: Ai4sStructureSchema,
+      temperature: 0.2,
+      maxTokens: 1200,
+      attemptTag: tagged(opts.attemptTag, "structure"),
+    });
+    return { ...normalizeAi4sStructure(res.data, a), model: res.model, receiptId: res.receiptId, reused: res.reused };
+  }
   const res = await chatJson({
     model,
     purpose: "structure_article",
@@ -346,11 +498,13 @@ export async function runStructure(a: AnalyzeInputArticle, opts: StepOpts = {}):
 /** Content understanding grounded in the original; null on a content-filter refusal. */
 export async function runUnderstand(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun["writing"]> {
   const model = await modelFor("understand");
+  const ai4s = a.contentScope === "ai4s";
   const call = (image: ContentPart | null) => {
     const text = understandUser(a, !!image);
     checkAnalysisRunning();
     return chatJson({
-      model, purpose: "understand_article", subject: subjectOf(a), promptVersion: PROMPT_VERSIONS.understand, system: UNDERSTAND_SYSTEM,
+      model, purpose: "understand_article", subject: subjectOf(a), promptVersion: ai4s ? AI4S_PROMPT_VERSIONS.understand : PROMPT_VERSIONS.understand,
+      system: ai4s ? AI4S_UNDERSTAND_SYSTEM : UNDERSTAND_SYSTEM,
       user: image ? [{ type: "text", text }, image] : text, schema: UnderstandSchema, temperature: 0.2, maxTokens: 16_384,
       timeoutMs: 180_000, attemptTag: tagged(opts.attemptTag, "understand"),
     });
@@ -426,7 +580,7 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
     model,
     purpose: "summarize_article",
     subject: subjectOf(a),
-    promptVersion: PROMPT_VERSIONS.summarize,
+    promptVersion: a.contentScope === "ai4s" ? AI4S_PROMPT_VERSIONS.summarize : PROMPT_VERSIONS.summarize,
     system: "",
     user: short ? buildShortTweetPrompt(t) : isX ? buildLongTweetPrompt(t) : buildArticlePrompt(t),
     schema: SummarizeSchema,
@@ -470,7 +624,7 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
 }
 
 /** One judgement from the steps: the selection rule, the reader-facing copy and the structure. */
-export function normalizeAnalysis(run: AnalysisRun) {
+export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
   const label = run.prefilter.label;
   const titleZh = collapseWhitespace(run.writing?.titleZh ?? "");
   const summaryZh = (run.writing?.summaryZh ?? "").trim();
@@ -478,12 +632,14 @@ export function normalizeAnalysis(run: AnalysisRun) {
   // summary it cannot be published: it waits.
   const relevance = label === "BLOCK" ? "block" : run.writing && (!titleZh || !summaryZh) ? "unknown" : "pass";
   // Selected when the two scores add up to twice the tier threshold; the mean, floored, is the score
-  // shown (it never decides a half point on its own).
+  // shown (it never decides a half point on its own). The AI4S column does not auto-select until a
+  // sample calibration is authorised (industry/selection.ts), so its items stay candidates only.
   const values = run.scores && !run.scores.refused ? run.scores.values : null;
   const sum = values?.length === SCORE_CALLS ? values.reduce((total, v) => total + v, 0) : null;
   const score = sum === null ? null : Math.floor(sum / SCORE_CALLS);
   const threshold = run.scores?.threshold ?? null;
-  const selected = relevance === "pass" && sum !== null && threshold !== null && sum >= threshold * SCORE_CALLS;
+  const autoSelection = contentScope === "ai4s" ? SELECTION.ai4sAutoSelection : true;
+  const selected = relevance === "pass" && sum !== null && threshold !== null && sum >= threshold * SCORE_CALLS && autoSelection;
   const subjects = run.structure?.subjects ?? [];
   const tags = [...(run.structure?.tags ?? [])];
   for (const s of subjects) {
@@ -506,6 +662,9 @@ export function normalizeAnalysis(run: AnalysisRun) {
     reasonZh: run.writing?.reasonZh ?? null,
     scope: run.structure?.scope ?? "unknown",
     fact: run.structure?.fact ?? null,
+    contentScope,
+    domain: run.structure?.domain ?? null,
+    ai4a: run.structure?.ai4a ?? null,
   };
 }
 
@@ -529,7 +688,8 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
   // Its page first; extraction queues the analysis again (normally the queue already routed it there).
   if (waitsForPage(input)) return { analysisId: null, stale: false, needsBody: true, output: null, receiptIds: [], reused: true };
   const run = await runAnalysis(input, opts);
-  const out = normalizeAnalysis(run);
+  const contentScope = input.contentScope === "ai4s" ? "ai4s" : "astro";
+  const out = normalizeAnalysis(run, contentScope);
   const receiptIds = [
     run.prefilter.receiptId, ...(run.scores?.receiptIds ?? []), ...(run.writing?.receiptIds ?? []), ...(run.structure ? [run.structure.receiptId] : []),
   ];
@@ -548,6 +708,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     // is a model answer that carried no usable copy.
     ...(out.relevance === "unknown" ? { unknownReason: hasText ? "writing" : "material" } : {}),
     scope: out.scope, fact: out.fact,
+    contentScope, domain: out.domain, ai4a: out.ai4a,
   };
   const committed = await sql.begin(async (tx) => {
     const [current] = await tx<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${articleId} FOR UPDATE`;
@@ -555,7 +716,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     const [row] = await tx<{ id: number }[]>`
       INSERT INTO analyses (article_id, input_revision, origin, model, prompt_version, receipt_ids, relevance, category, tags,
         subjects, title_zh, summary_zh, reason_zh, score, selected, output)
-      VALUES (${articleId}, ${input.revision}, 'model', ${w?.model ?? run.prefilter.model}, ${ANALYZE_PROMPT_VERSION}, ${receiptIds},
+      VALUES (${articleId}, ${input.revision}, 'model', ${w?.model ?? run.prefilter.model}, ${contentScope === "ai4s" ? AI4S_ANALYZE_PROMPT_VERSION : ANALYZE_PROMPT_VERSION}, ${receiptIds},
         ${out.relevance}, ${out.category}, ${out.tags}, ${out.subjects}, ${out.titleZh}, ${out.summaryZh}, ${out.reasonZh},
         ${out.score}, ${out.selected}, ${tx.json(detail as never)})
       RETURNING id`;

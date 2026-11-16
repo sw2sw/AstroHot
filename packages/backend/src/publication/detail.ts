@@ -18,11 +18,33 @@ interface DetailRow extends ItemRow {
   tr_html: string | null;
   tr_complete: boolean | null;
   topics: string[];
+  content_scope: string;
+  excerpt: string | null;
 }
 
 export type DetailResult =
   | { kind: "found"; item: SiteItemDetail; row: DetailRow }
   | { kind: "not_found" };
+
+/**
+ * The original-language text the AI4S column may show beside its Chinese intro, and the wording that
+ * says what it actually is. Only text the source itself published in the open qualifies: the feed's own
+ * summary (coverage `official_abstract`) or a readable fragment of a page that stated a limit
+ * (`public_excerpt`). The stored body is not a public abstract under any licence — the site may hold it
+ * for judging while `site_fulltext` is false — so it never appears here, and an unrecorded coverage is
+ * not evidence that an excerpt came from the open either. No public abstract means the panel stays empty
+ * rather than falling back to something the reader was not offered.
+ */
+export function publicOriginalAbstract(
+  row: Pick<DetailRow, "content_scope" | "excerpt" | "coverage">,
+): { text: string; label: string } | null {
+  if (row.content_scope !== "ai4s") return null;
+  const text = row.excerpt?.trim();
+  if (!text) return null;
+  if (row.coverage === "official_abstract") return { text, label: "官方摘要（原文）" };
+  if (row.coverage === "public_excerpt") return { text, label: "公开可读片段（原文）" };
+  return null;
+}
 
 /** Adds stable ids to h2–h4 and returns the outline. */
 function withOutline(html: string): { html: string; outline: OutlineEntry[] } {
@@ -40,7 +62,7 @@ function withOutline(html: string): { html: string; outline: OutlineEntry[] } {
 
 async function loadRow(id: string): Promise<DetailRow | null> {
   const [row] = await sql<DetailRow[]>`
-    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete,
+    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, a.content_scope, a.excerpt, tr.body_html AS tr_html, tr.complete AS tr_complete,
       ${topicMembership()} AS topics
     ${ITEM_FROM}
     WHERE p.article_id = ${id}`;
@@ -80,6 +102,7 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
   if (!row || !hasItemPage({ visibility: row.visibility, sourceMode: row.source_mode })) return { kind: "not_found" };
 
   const summary = toItemSummary(row);
+  const originalAbstract = publicOriginalAbstract(row);
   if (row.visibility === "summary-only") {
     const item: SiteItemDetail = {
       ...summary,
@@ -99,6 +122,9 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
       group: null,
       hasTranslation: false,
       bodyLanguage: "original",
+      contentScope: row.content_scope,
+      originalAbstract: originalAbstract?.text ?? null,
+      originalAbstractLabel: originalAbstract?.label ?? null,
     };
     return { kind: "found", item, row };
   }
@@ -162,6 +188,12 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     group,
     hasTranslation: reading.hasTranslation,
     bodyLanguage: reading.bodyLanguage,
+    contentScope: row.content_scope,
+    // A limited AI4S intro (no full body shown) is based on the source's public official abstract or a
+    // public readable fragment: expose exactly that, labelled as what it is. A full-text item shows its
+    // body instead, and the stored body never stands in for a public abstract (see publicOriginalAbstract).
+    originalAbstract: row.body_mode === "full" ? null : originalAbstract?.text ?? null,
+    originalAbstractLabel: row.body_mode === "full" ? null : originalAbstract?.label ?? null,
   };
   return { kind: "found", item, row };
 }

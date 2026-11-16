@@ -20,6 +20,7 @@ Choose `main` for the comprehensive website. To explore lightweight aggregation,
 ## Features
 
 - **News and selected items**: configurable sources, screening, event grouping, and deduplication, with original links, dates, and attribution.
+- **AI4S research column**: isolated reading lists, discipline and AI4A filters, manual selection, and evidence notes. The public pack supplies only a disabled synthetic source example; automatic selection is off. See [setup and boundaries](docs/AI4S.en.md).
 - **Paper reading**: arXiv metadata collection, model-assisted initial screening, and bilingual reading. Collection, analysis, and display have separate controls.
 - **Daily, weekly, and monthly reports**: daily issues are arranged by rules; weekly and monthly issues compile daily reports. Issues without eligible entries are skipped rather than published empty.
 - **Web and API**: desktop and mobile reading, topic and event navigation. Reading pages do not invoke models.

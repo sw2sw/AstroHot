@@ -57,7 +57,7 @@ test("pending summary follows calendar states without claiming official verifica
   }
 });
 
-test("homepage exposes a prominent topic banner above the card row", async () => {
+test("public Nobel demo component stays synthetic after the homepage entry changes", async () => {
   const { HomeNobelLink } = await vite.ssrLoadModule("/app/routes/home.tsx");
   assert.equal(typeof HomeNobelLink, "function");
   const router = createMemoryRouter([{ path: "/", element: createElement(HomeNobelLink) }]);
@@ -79,4 +79,14 @@ test("desktop sidebar and phone more page expose navigation to the topic", async
     assert.match(html, /href="\/nobel"/);
     assert.match(html, /诺贝尔奖 2026/);
   }
+});
+
+test("homepage uses AI4S while retaining the synthetic Nobel route", async () => {
+  const { HomeAi4sLink } = await vite.ssrLoadModule("/app/routes/home.tsx");
+  const router = createMemoryRouter([{ path: "/", element: createElement(HomeAi4sLink) }]);
+  const html = renderToStaticMarkup(createElement(RouterProvider, { router }));
+  assert.match(html, /href="\/ai4s"/);
+  assert.match(html, /AI4S · AI赋能科学/);
+  const source = readFileSync(new URL("../app/routes/home.tsx", import.meta.url), "utf8");
+  assert.match(source, /<HomeAi4sLink \/>/);
 });

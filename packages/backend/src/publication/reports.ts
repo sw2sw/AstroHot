@@ -8,7 +8,7 @@ import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { isoWeekRange, monthRange } from "@aihot/contracts/time";
 import { dailyUrl, itemUrl, periodUrl, siteUrl } from "./links.ts";
 import { publicSourceName } from "./rules.ts";
-import { listedCondition } from "./scope.ts";
+import { astroScopeCondition, listedCondition } from "./scope.ts";
 
 export type { ReportKind };
 
@@ -35,14 +35,16 @@ interface Availability {
 async function availability(ids: string[]): Promise<Map<string, Availability>> {
   const out = new Map<string, Availability>();
   if (ids.length === 0) return out;
-  const rows = await sql<{ id: string; visibility: string; eligible: boolean; summary: string | null; first_party: boolean; source_id: string; source_name: string | null; icon_url: string | null; at: Date | null }[]>`
-    SELECT p.article_id AS id, p.visibility, p.eligible, p.summary, (s.tier = 'T1') AS first_party, p.source_id, s.name AS source_name, s.icon_url,
+  const rows = await sql<{ id: string; visibility: string; eligible: boolean; in_astro_scope: boolean; summary: string | null; first_party: boolean; source_id: string; source_name: string | null; icon_url: string | null; at: Date | null }[]>`
+    SELECT p.article_id AS id, p.visibility, p.eligible, ${astroScopeCondition()} AS in_astro_scope, p.summary, (s.tier = 'T1') AS first_party, p.source_id, s.name AS source_name, s.icon_url,
       coalesce(p.published_at, p.discovered_at) AS at
     FROM publications p LEFT JOIN sources s ON s.id = p.source_id
     WHERE p.article_id IN ${sql(ids)}`;
   for (const r of rows) {
     out.set(r.id, {
-      available: r.visibility === "public" && r.eligible,
+      // A cited item stays public only while it is in astronomy scope: a revoked AI4S cross-list is no
+      // longer publicly cited by an astronomy issue, even though the row itself is still public.
+      available: r.visibility === "public" && r.eligible && r.in_astro_scope,
       summary: r.summary,
       firstParty: r.first_party,
       sourceId: r.source_id,
@@ -59,8 +61,8 @@ export async function unavailableIds(ids: string[]): Promise<Set<string>> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (!unique.length) return new Set();
   const rows = await sql<{ id: string }[]>`
-    SELECT article_id AS id FROM publications
-    WHERE article_id = ANY(${unique}::text[]) AND (visibility <> 'public' OR NOT eligible)`;
+    SELECT p.article_id AS id FROM publications p
+    WHERE p.article_id = ANY(${unique}::text[]) AND (p.visibility <> 'public' OR NOT p.eligible OR NOT ${astroScopeCondition()})`;
   return new Set(rows.map((r) => r.id));
 }
 

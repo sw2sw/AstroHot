@@ -60,11 +60,11 @@ const DAY_MS = 86_400_000;
 /** A listing title that is no headline: a label that swallowed its summary, or a call to action. */
 const needsTitle = (title: string) => title.length > 100 || /^(read more|learn more|continue reading|more|阅读全文|阅读更多|查看详情|了解更多)$/i.test(title.trim());
 
-async function store(sourceId: string, candidates: Candidate[], backfill: string | null): Promise<{ created: number; revised: number }> {
+async function store(sourceId: string, candidates: Candidate[], backfill: string | null, contentScope: "astro" | "ai4s" = "astro"): Promise<{ created: number; revised: number }> {
   let created = 0;
   let revised = 0;
   for (const c of candidates) {
-    const material = { ...c, sourceId, via: "fetch" as const, backfill };
+    const material = { ...c, sourceId, via: "fetch" as const, backfill, contentScope };
     const res = await upsertMaterial(material);
     if (res.created) created += 1;
     if (res.revised) revised += 1;
@@ -162,16 +162,51 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
     // First import of a new source: bounded, and archived by source time (never "today", never pushed).
     const backfillLimit = Number(source.config._aihot?.initialBackfillLimit ?? 30);
     const backfillMonths = Number(source.config._aihot?.initialBackfillMonths ?? 12);
+    // Identities already stored: an onboarding run re-offers them idempotently and the detail pass skips
+    // them. Read once, before the date floor, so the floor can tell a new identity from a known one.
+    const known = await storedTitles(candidates.map((c) => c.identityKey!));
     if (firstImport) {
       const cutoff = Date.now() - backfillMonths * 30 * 86400000;
-      candidates = candidates.filter((c) => !c.publishedAt || !Number.isFinite(c.publishedAt.getTime()) || c.publishedAt.getTime() >= cutoff).slice(0, backfillLimit);
+      candidates = candidates.filter((c) => !c.publishedAt || !Number.isFinite(c.publishedAt.getTime()) || c.publishedAt.getTime() >= cutoff);
+      // A pinned first import takes only its allowlisted URLs (the proposed baseline), by stored identity.
+      const allowlist = source.config._aihot?.initialUrlAllowlist;
+      if (Array.isArray(allowlist) && allowlist.length) {
+        const keys = new Set(allowlist.map((u: string) => identityKeyForUrl(u) ?? u));
+        candidates = candidates.filter((c) => keys.has(c.identityKey!));
+      }
+      candidates = candidates.slice(0, backfillLimit);
+      // The onboarding date floor persists for later runs: same-day new entries pass, older history never does.
+      if (source.config._aihot?.initialNotBefore) nextCursor.onboardingNotBefore = source.config._aihot.initialNotBefore;
+    } else {
+      const notBefore = Date.parse(String(source.cursor?.onboardingNotBefore ?? ""));
+      if (Number.isFinite(notBefore)) {
+        // A known identity is re-offered idempotently regardless of its date. A new identity must prove it
+        // is at/after the floor with a verifiable source date; a missing or corrupt date cannot, so it is
+        // held for review rather than admitted with a publication time faked from discovery. What was held
+        // and why is counted on the run, so a reviewer can see the decision instead of an unexplained gap.
+        let undated = 0;
+        let beforeFloor = 0;
+        candidates = candidates.filter((c) => {
+          if (known.has(c.identityKey!)) return true;
+          const t = c.publishedAt?.getTime();
+          if (t === undefined || !Number.isFinite(t)) {
+            undated += 1;
+            return false;
+          }
+          if (t < notBefore) {
+            beforeFloor += 1;
+            return false;
+          }
+          return true;
+        });
+        if (undated || beforeFloor) detail = { ...(detail ?? {}), held: { undated, beforeFloor } };
+      }
     }
     // Every other run keeps all it was given: the cursor (an RSS validator) moves past the whole listing,
     // so an entry cut here would never be offered again.
 
     // Detail pages only for material we have not seen (bounded per run), and only for what the listing lacks.
     const d = source.config.detail;
-    const known = d ? await storedTitles(candidates.map((c) => c.identityKey!)) : new Map<string, string>();
     const detailBudget = Number(d?.maxFetches ?? 0);
     let detailUsed = 0;
     for (const c of candidates) {
@@ -211,7 +246,7 @@ export async function collectSource(sourceId: string, opts: { force?: boolean } 
       }
     }
 
-    ({ created, revised } = await store(sourceId, candidates, firstImport ? "first-import" : null));
+    ({ created, revised } = await store(sourceId, candidates, firstImport ? "first-import" : null, source.config.contentScope === "ai4s" ? "ai4s" : "astro"));
 
     if (firstImport) nextCursor.initializedAt = new Date().toISOString();
     nextCursor.lastOkAt = new Date().toISOString();

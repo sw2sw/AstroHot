@@ -69,6 +69,13 @@ export function HomeNobelLink() {
   </Link>;
 }
 
+export function HomeAi4sLink() {
+  return <Link to="/ai4s" className="mb-4 flex min-h-16 items-center justify-between gap-3 rounded-card border border-accent/50 bg-accent/10 px-4 py-3 transition-colors hover:bg-accent/20">
+    <div className="min-w-0"><p className="text-base font-bold text-ink">AI4S · AI赋能科学</p><p className="mt-0.5 text-xs text-ink-2">追踪科研进展，关注AI与天文</p></div>
+    <span className="shrink-0 text-sm font-semibold text-accent">进入栏目 →</span>
+  </Link>;
+}
+
 export default function Home() {
   const { data, filters, imagery } = useLoaderData<typeof loader>();
   const title = filters.tag ? `#${filters.tag}` : "精选";
@@ -85,7 +92,7 @@ export default function Home() {
         </div>
       </div>
 
-      <HomeNobelLink />
+      <HomeAi4sLink />
       <div className={`mb-4 grid items-stretch gap-4 ${imagery ? "xl:grid-cols-2" : ""} [&>*]:h-full`}>
       {imagery && <Link to="/imagery" className="card flex min-w-0 items-center gap-3 p-3 hover:bg-bg-sunk">{safeImageUrl(imagery) && <img src={safeImageUrl(imagery)!} alt={imagery.altEn ?? imagery.titleEn} className="h-20 w-28 shrink-0 rounded-card bg-bg-sunk object-contain" loading="lazy"/>}<div className="min-w-0"><p className="text-xs text-ink-4">天文影像 · 最近存档 {imagery.sourceDate}</p><p className="truncate text-sm font-semibold"><MathText text={imagery.titleZh?.trim() || imagery.titleEn} /></p><p className="truncate text-xs text-ink-3"><MathText text={imagery.titleEn} /></p></div><span className="ml-auto shrink-0 text-sm text-accent">详情 →</span></Link>}
       <HomeCalendarCard today={shanghaiDate()} />
