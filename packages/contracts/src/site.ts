@@ -193,6 +193,32 @@ export interface PoolResponse {
   freshness: string;
 }
 
+/** One card of the AI4S column: the shared summary plus the column's domain, AI4A finding and source link. */
+export interface Ai4sItemSummary extends FeedItemSummary {
+  originalTitle: string | null;
+  links: { original: string };
+  /** The discipline domain (industry/ai4s.ts); null when the material did not decide one. */
+  domain: string | null;
+  /** Verified astronomy application (AI4A): true only with grounded original evidence, else false/null. */
+  ai4a: boolean | null;
+  /** Where a limited intro came from and what the original allows; null when the site shows full text. */
+  accessNote: string | null;
+}
+
+export interface Ai4sFeedResponse {
+  tab: "selected" | "all";
+  domain: string | null;
+  items: Ai4sItemSummary[];
+  page: number;
+  pageCount: number;
+  total: number;
+  updatedAt: string | null;
+  /** Identity-set fingerprint of the whole filtered scope (empty scope still yields a stable hash). */
+  contentTag: string;
+  /** The scope's comparable identity map, one entry per item, for the click-to-update diff. */
+  groups: ScopeGroup[];
+}
+
 export interface OutlineEntry {
   id: string;
   text: string;
@@ -223,6 +249,13 @@ export interface SiteItemDetail extends ItemSummary {
   group: GroupInfo | null;
   hasTranslation: boolean;
   bodyLanguage: "zh" | "original";
+  /** Which column the material belongs to ("astro" or "ai4s"); the detail keeps its own behavior per column. */
+  contentScope?: string;
+  /** AI4S limited intro: the public original-language excerpt shown beside the Chinese intro. Only text the
+   *  source published in the open (its own feed summary, or a readable fragment of a limited page). */
+  originalAbstract?: string | null;
+  /** What that text actually is, in the reader's language ("官方摘要（原文）" / "公开可读片段（原文）"). */
+  originalAbstractLabel?: string | null;
 }
 
 /** A fact's public reports under the list's filters: what "另有 N 家信源报道" opens. */

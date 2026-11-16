@@ -16,4 +16,10 @@ export const SELECTION = {
    * 其余用更便宜的“标题摘要翻译”。
    */
   understandFloor: 50,
+  /**
+   * AI4S 栏目（AI 赋能科学）的自动精选开关。未经主审授权的小样本校准之前默认关闭：
+   * 该栏目的资料照常评分、理解、结构化，但不自动进精选，只能由编辑人工精选（editorial_overrides.selected）。
+   * 天文栏目不受此开关影响，仍按上面的门槛自动精选。
+   */
+  ai4sAutoSelection: false,
 } as const;

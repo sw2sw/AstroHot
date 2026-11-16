@@ -9,6 +9,9 @@ import { promptText } from "./prompts.ts";
 
 export const PREFILTER_SYSTEM = promptText("prefilter");
 export const UNDERSTAND_SYSTEM = promptText("understand");
+// The AI4S column writes under its own discipline-neutral domain rules; the astronomy system above is
+// left untouched (it forces astronomy translations that would misrender life-science/materials material).
+export const AI4S_UNDERSTAND_SYSTEM = promptText("ai4s-understand");
 
 /** A body longer than this is cut (whole bodies are sent; a few run past the context). */
 export const MAX_BODY_CHARS = 60_000;
@@ -209,6 +212,8 @@ export interface TranslateInput {
   datePrecision?: string | null;
   /** The item's own nature: a journal's news story is not a peer-reviewed paper. */
   contentKind?: string | null;
+  /** The column the material belongs to; AI4S writes under discipline-neutral domain rules. */
+  contentScope?: string | null;
 }
 
 export function translateInputOf(a: AnalyzeInputArticle): TranslateInput {
@@ -228,6 +233,7 @@ export function translateInputOf(a: AnalyzeInputArticle): TranslateInput {
     coverage: a.coverage ?? null,
     datePrecision: a.datePrecision ?? null,
     contentKind: a.contentKind ?? null,
+    contentScope: a.contentScope ?? null,
   };
 }
 
@@ -350,7 +356,7 @@ function materialRule(input: TranslateInput): string {
 }
 
 export function buildArticlePrompt(input: TranslateInput): string {
-  return promptText("summarize-article", {
+  return promptText(input.contentScope === "ai4s" ? "ai4s-summarize-article" : "summarize-article", {
     publishedDate: anchorDate(input.publishedAt),
     today: anchorDate(new Date()),
     sourceName: sourceName(input.sourceName),

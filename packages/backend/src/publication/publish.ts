@@ -12,7 +12,7 @@ import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import {
   bodyModeOf, channelOf, displayTags, isIndexable, isPoolEligible, isSelectable, mayRedistribute, publicSourceName, type SourceFacts,
 } from "./rules.ts";
-import { latestCompositeCondition, ownFactEvidenceCondition } from "./scope.ts";
+import { astroScopeCondition, latestCompositeCondition, ownFactEvidenceCondition } from "./scope.ts";
 
 interface ArticleRow {
   id: string;
@@ -30,6 +30,7 @@ interface ArticleRow {
   grouped_at: Date | null;
   grouping_status: "pending" | "complete" | "failed";
   selection_adds_value: boolean | null;
+  content_scope: string;
 }
 
 interface AnalysisRow {
@@ -43,6 +44,7 @@ interface AnalysisRow {
   reason_zh: string | null;
   score: number | null;
   selected: boolean | null;
+  output: Record<string, any> | null;
 }
 
 interface OverrideRow {
@@ -74,6 +76,10 @@ interface PublicationRow {
   indexable: boolean;
   seo_indexed_at: Date | null;
   seo_excluded_at: Date | null;
+  content_scope: string;
+  domain: string | null;
+  ai4a: boolean | null;
+  astro_cross_listed: boolean;
 }
 
 export interface V1ItemPayload {
@@ -159,15 +165,18 @@ async function settleSeats(tx: Tx, factId: number | null, self: string | null, n
     if (self) await tx`UPDATE publications SET seat = true WHERE article_id = ${self} AND NOT seat`;
     return null;
   }
-  const members = await tx<Array<Pick<PublicationRow, "article_id" | "score"> & RepresentativeIdentity & { body_mode: "full" | "summary"; timeline_at: Date; seat: boolean; holds: boolean }>>`
+  const members = await tx<Array<Pick<PublicationRow, "article_id" | "score"> & RepresentativeIdentity & { body_mode: "full" | "summary"; timeline_at: Date; seat: boolean; holds: boolean; astro: boolean }>>`
     SELECT p.article_id, p.body_mode, p.score, p.timeline_at, p.seat, ${REPRESENTATIVE_COLUMNS},
-      (p.selected AND p.visibility = 'public' AND ${ownFactEvidenceCondition()}) AS holds
+      (p.selected AND p.visibility = 'public' AND ${ownFactEvidenceCondition()} AND ${astroScopeCondition()}) AS holds,
+      ${astroScopeCondition()} AS astro
     FROM publications p JOIN sources s ON s.id = p.source_id JOIN facts f ON f.id = p.fact_id WHERE p.fact_id = ${factId}`;
   const candidates = members.filter((m) => m.holds).map((m) => ({ ...m, score: m.score === null ? null : Number(m.score) }));
   const rep = candidates.length ? pickRepresentative(candidates) : null;
   let own: "upsert" | "remove" | null = null;
   for (const m of members) {
-    const seat = !m.holds || m.article_id === rep?.article_id;
+    // An AI4S report never holds an astronomy machine seat unless an editor cross-listed it; it must
+    // not displace the fact's astronomy representative either.
+    const seat = m.astro && (!m.holds || m.article_id === rep?.article_id);
     if (seat === m.seat) continue;
     await tx`UPDATE publications SET seat = ${seat} WHERE article_id = ${m.article_id}`;
     const change = await syncLedger(tx, m.article_id, now);
@@ -180,13 +189,13 @@ async function settleSeats(tx: Tx, factId: number | null, self: string | null, n
 async function syncLedger(tx: Tx, articleId: string, now: Date): Promise<"upsert" | "remove" | null> {
   const [p] = await tx<Array<{ selected: boolean; visibility: string; seat: boolean; title: string; original_title: string | null; summary: string | null;
     url: string; published_at: Date | null; discovered_at: Date; category: string | null; score: string | number | null; reason: string | null;
-    source_name: string }>>`
+    source_name: string; in_astro_scope: boolean }>>`
     SELECT p.selected, p.visibility, p.seat, p.title, p.original_title, p.summary, p.url, p.published_at, p.discovered_at, p.category,
-           p.score, p.reason, s.name AS source_name
+           p.score, p.reason, s.name AS source_name, ${astroScopeCondition()} AS in_astro_scope
     FROM publications p JOIN sources s ON s.id = p.source_id WHERE p.article_id = ${articleId}`;
   if (!p) return null;
   const [state] = await tx<{ in_set: boolean; payload_hash: string | null }[]>`SELECT in_set, payload_hash FROM selected_state WHERE article_id = ${articleId}`;
-  if (p.selected && p.visibility === "public" && p.seat) {
+  if (p.selected && p.visibility === "public" && p.seat && p.in_astro_scope) {
     const payload = v1Payload({
       articleId, title: p.title, originalTitle: p.original_title, summary: p.summary, sourceName: p.source_name, url: p.url,
       publishedAt: p.published_at, discoveredAt: p.discovered_at, category: p.category, score: p.score === null ? null : Number(p.score), selected: true, reason: p.reason,
@@ -211,7 +220,7 @@ export async function publishArticle(articleId: string, options: PublishOptions 
 export async function publishArticleTx(tx: Tx, articleId: string, options: PublishOptions = {}): Promise<PublishResult | null> {
   const [article] = await tx<ArticleRow[]>`
     SELECT id, source_id, url, title, language, published_at, discovered_at, timeline_at, backfill, body_status,
-           body_text, x_post, grouped_at, grouping_status, selection_adds_value
+           body_text, x_post, grouped_at, grouping_status, selection_adds_value, content_scope
     FROM articles WHERE id = ${articleId} FOR UPDATE`;
   if (!article) return null;
   // Explicit imports carry an already-public editorial decision, not a new pending judgement.
@@ -223,7 +232,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     SELECT id, name, kind, tier, participation_mode, first_party, site_fulltext, syndicate_fulltext FROM sources WHERE id = ${article.source_id}`;
   if (!source) return null;
   const [analysis] = await tx<AnalysisRow[]>`
-    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected
+    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected, output
     FROM analyses WHERE article_id = ${articleId} ORDER BY input_revision DESC, id DESC LIMIT 1`;
   const [override] = await tx<OverrideRow[]>`SELECT fields, visibility FROM editorial_overrides WHERE article_id = ${articleId}`;
   const [membership] = await tx<{ fact_id: number; story_id: number | null }[]>`
@@ -268,6 +277,17 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const bodyMode = bodyModeOf(source, article.body_status, !!article.body_text && article.body_text.length > 0);
   const syndicate = mayRedistribute(source, bodyMode);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);
+  // The column a row belongs to is fixed at material creation; domain and the AI4A finding come from
+  // the judgement. Cross-listing into astronomy is an audited override, only meaningful while eligible
+  // AND backed by an astronomy approval: a verified AI4A finding (ai4a===true), or an independent,
+  // structured manual astronomy determination (astroApproved with a recorded note). A bare crossListed
+  // request — or the override's generic reason — is not an astronomy review. The projection re-checks
+  // approval here, so an unapproved request never reaches astronomy and a revoked approval converges.
+  const contentScope = article.content_scope === "ai4s" ? "ai4s" : "astro";
+  const domain = typeof analysis?.output?.domain === "string" ? analysis.output.domain : null;
+  const ai4a = typeof analysis?.output?.ai4a === "boolean" ? analysis.output.ai4a : null;
+  const manualAstroApproval = f.astroApproved === true && typeof f.astroApprovalNote === "string" && f.astroApprovalNote.trim().length > 0;
+  const astroCrossListed = f.crossListed === true && eligible && (ai4a === true || manualAstroApproval);
 
   // Waiting candidates are readable in the pool, with no selected seat, sync entry or push.
   // Completion stamps the actual release after lock waits, including across report cutoffs.
@@ -294,7 +314,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     source_id: source.id, first_party: source.tier === "T1",
     visibility, eligible, selected, selection_candidate: selectionCandidate, title: title ?? collapseWhitespace(article.title), original_title: originalTitle, summary, reason,
     category, tags, score: round1(score), body_mode: bodyMode, story_id: membership?.story_id ?? null, fact_id: membership?.fact_id ?? null,
-    indexable,
+    indexable, content_scope: contentScope, domain, ai4a, astro_cross_listed: astroCrossListed,
   };
   const changed =
     !previous ||
@@ -305,17 +325,18 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
         original_title: previous.original_title, summary: previous.summary, reason: previous.reason, category: previous.category,
         tags: [...previous.tags].sort(), score: previous.score === null ? null : Number(previous.score), body_mode: previous.body_mode,
         story_id: previous.story_id, fact_id: previous.fact_id, indexable: previous.indexable,
+        content_scope: previous.content_scope, domain: previous.domain, ai4a: previous.ai4a, astro_cross_listed: previous.astro_cross_listed,
       });
   const revision = previous ? previous.revision + (changed ? 1 : 0) : 1;
 
   await tx`
     INSERT INTO publications (article_id, analysis_id, revision, visibility, eligible, selected, selection_candidate, title, original_title, summary,
       reason, category, tags, score, source_id, channel, first_party, url, published_at, discovered_at, timeline_at, backfill,
-      selected_ready_at, visible_after, body_mode, syndicate, indexable, story_id, fact_id, search_text, sort_at, updated_at)
+      selected_ready_at, visible_after, body_mode, syndicate, indexable, story_id, fact_id, content_scope, domain, ai4a, astro_cross_listed, search_text, sort_at, updated_at)
     VALUES (${articleId}, ${analysis?.id ?? null}, ${revision}, ${visibility}, ${eligible}, ${selected}, ${selectionCandidate}, ${next.title},
       ${originalTitle}, ${summary}, ${reason}, ${category}, ${tags}, ${next.score}, ${source.id}, ${channel}, ${source.tier === "T1"},
       ${article.url}, ${article.published_at}, ${article.discovered_at}, ${article.timeline_at}, ${article.backfill},
-      ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${syndicate}, ${indexable}, ${next.story_id}, ${next.fact_id}, ${searchText}, ${sortAt}, now())
+      ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${syndicate}, ${indexable}, ${next.story_id}, ${next.fact_id}, ${contentScope}, ${domain}, ${ai4a}, ${astroCrossListed}, ${searchText}, ${sortAt}, now())
     ON CONFLICT (article_id) DO UPDATE SET
       analysis_id = EXCLUDED.analysis_id, revision = EXCLUDED.revision, visibility = EXCLUDED.visibility,
       eligible = EXCLUDED.eligible, selected = EXCLUDED.selected, selection_candidate = EXCLUDED.selection_candidate, title = EXCLUDED.title, original_title = EXCLUDED.original_title,
@@ -325,6 +346,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
       timeline_at = EXCLUDED.timeline_at, backfill = EXCLUDED.backfill, selected_ready_at = EXCLUDED.selected_ready_at,
       visible_after = EXCLUDED.visible_after, body_mode = EXCLUDED.body_mode, syndicate = EXCLUDED.syndicate,
       indexable = EXCLUDED.indexable, story_id = EXCLUDED.story_id, fact_id = EXCLUDED.fact_id,
+      content_scope = EXCLUDED.content_scope, domain = EXCLUDED.domain, ai4a = EXCLUDED.ai4a, astro_cross_listed = EXCLUDED.astro_cross_listed,
       -- updated_at is also the reader-side admission signal (timeline.ts reads max(updated_at)
       -- over a filtered scope): "an item arrived" must be provable even when the item carries an OLD
       -- release date. It is refreshed here, and only when the guard below accepts the write, so an
@@ -336,7 +358,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
         publications.source_id, publications.channel, publications.first_party, publications.url,
         publications.published_at, publications.discovered_at, publications.timeline_at, publications.backfill,
         publications.selected_ready_at, publications.visible_after, publications.body_mode, publications.syndicate,
-        publications.indexable, publications.story_id, publications.fact_id, publications.search_text,
+        publications.indexable, publications.story_id, publications.fact_id, publications.content_scope, publications.domain, publications.ai4a, publications.astro_cross_listed, publications.search_text,
         publications.sort_at)
       IS DISTINCT FROM (EXCLUDED.analysis_id, EXCLUDED.revision, EXCLUDED.visibility, EXCLUDED.eligible,
         EXCLUDED.selected, EXCLUDED.selection_candidate, EXCLUDED.title, EXCLUDED.original_title, EXCLUDED.summary,
@@ -344,7 +366,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
         EXCLUDED.source_id, EXCLUDED.channel, EXCLUDED.first_party, EXCLUDED.url,
         EXCLUDED.published_at, EXCLUDED.discovered_at, EXCLUDED.timeline_at, EXCLUDED.backfill,
         EXCLUDED.selected_ready_at, EXCLUDED.visible_after, EXCLUDED.body_mode, EXCLUDED.syndicate,
-        EXCLUDED.indexable, EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.search_text,
+        EXCLUDED.indexable, EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.content_scope, EXCLUDED.domain, EXCLUDED.ai4a, EXCLUDED.astro_cross_listed, EXCLUDED.search_text,
         EXCLUDED.sort_at)`;
 
   // The pool search row follows eligibility; its body part only covers full text the site may show.

@@ -56,6 +56,8 @@ export interface MaterialInput {
   discoveredAt?: Date;
   /** Explicit backfill: first import of a new source, or a report flagged as backfill. */
   backfill?: string | null;
+  /** Which column the material belongs to; the source's contentScope, defaulting to astronomy. */
+  contentScope?: "astro" | "ai4s";
   /** Keep an existing id when importing history. */
   id?: string;
 }
@@ -156,13 +158,13 @@ async function upsertIn(db: Db, m: MaterialInput): Promise<MaterialResult> {
   const [inserted] = await db<{ id: string }[]>`
     INSERT INTO articles (id, source_id, identity_key, url, title, author, language, published_at, published_at_claim,
       discovered_at, source_updated_at, timeline_at, backfill, backfill_reason, revision, content_hash, excerpt,
-      body_text, body_html, body_status, coverage, access, media, x_post, raw)
+      body_text, body_html, body_status, coverage, access, media, x_post, raw, content_scope)
     VALUES (${newId}, ${m.sourceId}, ${identityKey}, ${m.url}, ${title}, ${m.author ?? null}, ${m.language ?? null},
       ${t.publishedAt}, ${m.publishedAt ?? null}, ${discoveredAt}, ${m.sourceUpdatedAt ?? null}, ${t.timelineAt},
       ${t.backfill}, ${t.backfillReason}, 1, ${hash}, ${m.excerpt ?? null}, ${m.bodyText ?? null}, ${m.bodyHtml ?? null},
       ${m.bodyStatus ?? (m.bodyText ? "ok" : "pending")}, ${m.coverage ?? null}, ${m.access ?? null},
       ${db.json((m.media ?? []) as never)},
-      ${m.xPost ? db.json(m.xPost as never) : null}, ${m.raw === undefined ? null : db.json(m.raw as never)})
+      ${m.xPost ? db.json(m.xPost as never) : null}, ${m.raw === undefined ? null : db.json(m.raw as never)}, ${m.contentScope ?? "astro"})
     ON CONFLICT (identity_key) DO NOTHING RETURNING id`;
   if (inserted) {
     await db`INSERT INTO article_revisions (article_id, revision, content_hash, title, body_text)

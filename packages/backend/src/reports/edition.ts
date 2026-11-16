@@ -12,7 +12,7 @@ import { sql } from "../db.ts";
 import { currentSignals } from "../events/hot.ts";
 import { pickRepresentative, representativePriority, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "../publication/representative.ts";
 import { factSources } from "../publication/coverage.ts";
-import { evidenceCondition, listedCondition, ownFactEvidenceCondition } from "../publication/scope.ts";
+import { astroScopeCondition, evidenceCondition, listedCondition, ownFactEvidenceCondition } from "../publication/scope.ts";
 
 /** Each category's section; several categories may share one, in the order the pack lists them. */
 export const SECTION_OF: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.section]));
@@ -111,7 +111,7 @@ export async function periodReports(start: Date, end: Date): Promise<ReportRow[]
       LEFT JOIN facts f ON f.id = p.fact_id AND ${ownFactEvidenceCondition()}
       LEFT JOIN stories st ON st.id = f.story_id
       -- Attribute each item by the later of arrival and release; either range can use its index.
-      WHERE p.visibility = 'public' AND p.selected AND NOT p.backfill
+      WHERE p.visibility = 'public' AND p.selected AND NOT p.backfill AND ${astroScopeCondition()}
         AND (
           (p.visible_after <= p.timeline_at AND p.timeline_at >= ${start} AND p.timeline_at < ${end})
           OR (p.visible_after > p.timeline_at AND p.visible_after >= ${start} AND p.visible_after < ${end})
@@ -180,7 +180,7 @@ export async function periodEntries(startDate: string, endDate: string): Promise
     FROM publications p JOIN sources s ON s.id = p.source_id
     LEFT JOIN facts f ON f.id = p.fact_id AND ${ownFactEvidenceCondition()}
     LEFT JOIN stories st ON st.id = f.story_id
-    WHERE p.article_id = ANY(${[...new Set(carried.map((c) => c.id))]}::text[]) AND p.visibility = 'public' AND p.eligible`;
+    WHERE p.article_id = ANY(${[...new Set(carried.map((c) => c.id))]}::text[]) AND p.visibility = 'public' AND p.eligible AND ${astroScopeCondition()}`;
   const byId = new Map(rows.map((r) => [r.id, r]));
   const events = groupBy(carried.filter((c) => byId.has(c.id)), (c) => {
     const r = byId.get(c.id)!;

@@ -4,7 +4,7 @@ import { sql, type Db } from "../db.ts";
 import { decodeCursor, encodeCursor, InvalidCursorError, queryBinding } from "../lib/cursor.ts";
 import { newShortId } from "../lib/ids.ts";
 import { categoryCondition, API_ITEM_COLUMNS, API_ITEM_FROM, type ApiItemRow } from "./items.ts";
-import { listedCondition, seatedCondition } from "./scope.ts";
+import { astroScopeCondition, listedCondition, seatedCondition } from "./scope.ts";
 import { publicMatchCondition, searchTerms, withSearchCapacity } from "./pool.ts";
 import { v1Payload, type V1ItemPayload } from "./publish.ts";
 
@@ -167,6 +167,7 @@ export async function selectedSnapshot(q: SnapshotQuery, now = new Date()) {
       ORDER BY article_id, seq DESC
     ) latest
     JOIN selected_state st ON st.article_id = latest.article_id AND st.in_set
+    JOIN publications p ON p.article_id = latest.article_id AND ${astroScopeCondition()}
     WHERE latest.op = 'upsert'
     ORDER BY latest.article_id
     LIMIT ${q.limit + 1}`;

@@ -20,6 +20,7 @@ import { NewsImage } from "../features/item/NewsImage";
 import { MediaGallery } from "../features/item/MediaGallery";
 import { QuotedPost } from "../features/item/QuotedPost";
 import { ArticleBody } from "../features/item/ArticleBody";
+import { Ai4sIntro } from "../features/item/Ai4sIntro";
 import { ActionsSheet, ReaderToolbar, type ActionRow } from "../features/item/ReaderTools";
 import { OutlineSheet, scrollToAnchor } from "../components/ui/OutlineSheet";
 import { takePreview } from "../features/item/preview";
@@ -289,6 +290,13 @@ function ItemView({ item }: { item: SiteItemDetail }) {
   const accessNote = item.accessNote ?? (summaryOnly ? "应来源方要求，这里只提供摘要与原文入口。完整内容请阅读原文。" : null);
   const showOutline = item.outline.length >= 3;
   const originalLabel = isX ? "在 X 查看原推" : "打开原文";
+  // AI4S bilingual reading: the column's limited intro is based on text the source published in the open,
+  // in the original language. Show it beside the Chinese intro on wide screens (stacked on phones) only when
+  // it really is a foreign-language excerpt — a Chinese one adds nothing beside the Chinese intro — and let
+  // the server's own label say whether it is an official abstract or a readable fragment.
+  const bilingualAbstract = item.contentScope === "ai4s" && item.originalAbstract && !/[一-鿿]/.test(item.originalAbstract)
+    ? { text: item.originalAbstract, label: item.originalAbstractLabel ?? null }
+    : null;
 
   const related = item.relatedStories.filter((s) => s.publicId !== item.story?.publicId);
 
@@ -477,12 +485,14 @@ function ItemView({ item }: { item: SiteItemDetail }) {
           {item.channel === "news" && <NewsImage image={item.newsImage} title={item.title} />}
 
 
-          {item.summary && (
+          {item.summary && (bilingualAbstract ? (
+            <Ai4sIntro summary={item.summary} originalAbstract={bilingualAbstract.text} originalLabel={bilingualAbstract.label} label={summaryOnly ? "摘要" : "AI 导读"} />
+          ) : (
             <section className={isX ? "mt-4" : "mt-7 xl:mt-8"}>
               <div className="mb-2 text-[12px] font-semibold text-accent">{summaryOnly ? "摘要" : "AI 导读"}</div>
               <p className="text-[18px] leading-[1.7] text-ink xl:text-[20px] xl:leading-[1.7]"><MathText text={item.summary} /></p>
             </section>
-          )}
+          ))}
 
           {item.reason && !summaryOnly && (
             <section className="mt-6 border-t border-line pt-4 lg:hidden">

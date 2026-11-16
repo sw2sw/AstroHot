@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { subjectAfter, withSubject } from "@aihot/industry/site";
 import { FEATURES } from "@aihot/industry/features";
 import {
-  IconBolt, IconBookmark, IconChart, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconUser,
+  IconBolt, IconBookmark, IconChart, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconSparkles, IconUser,
 } from "../icons";
 
 export interface NavItem {
@@ -26,6 +26,7 @@ export const SIDEBAR: Array<{ title: string; items: NavItem[] }> = [
       { to: "/all", label: subjectAfter("全部", "动态"), icon: IconList },
       { to: "/hot", label: "热点榜", icon: IconFlame },
       { to: "/daily", label: withSubject("日报"), icon: IconDoc },
+      { to: "/ai4s", label: "AI4S 科研", icon: IconSparkles },
       { to: "/arxiv", label: "arXiv 候选", icon: IconDoc },
       { to: "/imagery", label: "天文影像", icon: IconGrid },
       { to: "/calendar", label: "天象日历", icon: IconGrid },
