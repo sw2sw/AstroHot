@@ -9,6 +9,7 @@ import { listAudit } from "@aihot/backend/audit";
 import { importSelectBenchRun, listSelectBenchRuns, selectBenchRun } from "@aihot/backend/admin/selectbench";
 import { modelsOverview, switchModel } from "@aihot/backend/admin/models";
 import { contentChain, overrideFields, rerun, searchContent, setSeoIndexed, setVisibility } from "@aihot/backend/admin/content";
+import { conferenceDetail, overrideConference } from "@aihot/backend/admin/conferences";
 import { detachFromFact, mergeStories } from "@aihot/backend/events/corrections";
 import { banSource, eraseFeedback, feedbackScreenshot, listFeedback, unbanSource, updateFeedback } from "@aihot/backend/admin/feedback";
 import { listMonitorEvents, listMonitorPosts, relinkPost, resolveMonitorPost, reviewReceipt, setWithdrawn, updateMonitorEvent } from "@aihot/backend/admin/monitor";
@@ -56,6 +57,15 @@ export function registerAdmin(app: FastifyInstance) {
   app.post("/api/admin/content/:id/visibility", adminHandler(async (req, _reply, admin) => setVisibility(param(req, "id"), body(req) as never, actorOf(admin))));
   app.post("/api/admin/content/:id/seo", adminHandler(async (req, reply, admin) => orNotFound(req, reply, await setSeoIndexed(param(req, "id"), body(req) as never, actorOf(admin)))));
   app.post("/api/admin/content/:id/override", adminHandler(async (req, _reply, admin) => overrideFields(param(req, "id"), body(req) as never, actorOf(admin))));
+
+  // 会议人工修正：改期、取消、补地点——带版本检查与审计，不提供匿名写入口。
+  app.get("/api/admin/conferences/:id", adminHandler(async (req, reply, _admin) => orNotFound(req, reply, await conferenceDetail(Number(param(req, "id"))))));
+  app.post("/api/admin/conferences/:id/override", adminHandler(async (req, reply, admin) => {
+    const id = Number(param(req, "id"));
+    if (!Number.isSafeInteger(id) || id <= 0) return notFound(req, reply);
+    const result = await overrideConference(id, body(req) as never, actorOf(admin));
+    return result === null ? notFound(req, reply) : result;
+  }));
   app.post("/api/admin/content/:id/rerun", adminHandler(async (req, reply, admin) => {
     const b = body<{ step: "extract" | "analyze" | "group" }>(req);
     const requestId = String(req.headers["idempotency-key"] ?? "");

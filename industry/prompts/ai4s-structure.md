@@ -28,4 +28,6 @@ fact 非 null 时还包含 evidence 与 conditions：
 
 输出前核对当前动作（优先于标题和宣传措辞）：标题里的引入性词语不能覆盖正文明确的先后关系；若正文说此前已公开、本文是分享或讲解，action 与 fact.title 必须写讲解；只有正文明确本次才首次公开，才写发布/发现/证明。没有明示本次动作的日期时 occurredAt 保持 null，不拿发布时间/抓取时间/被引用时间补。
 
-只输出一个 JSON 对象，字段：scope, domain, astroApplication, fact。
+{{> conference-notice}}
+
+只输出一个 JSON 对象，字段：scope, domain, astroApplication, fact, conference。

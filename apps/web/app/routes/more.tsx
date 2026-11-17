@@ -30,6 +30,7 @@ type Row = { to: string; label: string; icon: ReactNode; detail?: ReactNode; rel
 
 const TOOLS: Row[] = [
   { to: "/ai4s", label: "AI4S 科研", icon: <IconSparkles size={20} /> },
+  { to: "/conferences", label: "学术会议", icon: <IconGrid size={20} /> },
   { to: "/nobel", label: "诺贝尔奖 2026", icon: <IconSparkles size={20} />, reloadDocument: true },
   { to: "/arxiv", label: "arXiv 候选", icon: <IconGrid size={20} /> },
   { to: "/calendar", label: "天象日历", icon: <IconGrid size={20} />, detail: "合成示例" },

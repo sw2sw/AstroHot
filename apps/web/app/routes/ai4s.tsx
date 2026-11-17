@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, redirect, useLoaderData, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/ai4s";
-import type { Ai4sFeedResponse, Ai4sItemSummary } from "@aihot/contracts/site";
+import type { Ai4sFeedResponse, Ai4sItemSummary, ConferenceSummary } from "@aihot/contracts/site";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
 import { AI4S_DOMAINS, AI4S_DOMAIN_KEYS, AI4S_DOMAIN_LABEL } from "@aihot/industry/ai4s";
 import { edgeTtl, loadOr404 } from "../lib/api.server";
@@ -27,6 +27,8 @@ import { SourceLine } from "../features/feed/parts";
 import { markRead, useReadSet } from "../lib/local-state";
 import { rememberPreview } from "../features/item/preview";
 import { rememberOrigin, useReturnFocus } from "../features/item/return-focus";
+import { loadRecentConferences } from "../lib/conferences.server";
+import { ConferenceRecent } from "../features/conferences/Recent";
 import { adoptSignal, coerceGroups, evaluateContent, useNewContentNotice, type ContentBaseline, type ContentSignal } from "../features/feed/new-content";
 import { NewContentBanner } from "../features/feed/NewContentBanner";
 
@@ -50,7 +52,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     { signal: request.signal },
   );
   if (data.total > 0 && data.page > data.pageCount) throw redirect(pageHref(url.searchParams, data.pageCount));
-  return { data };
+  // 近期会议：首页一次公开读，不触发模型、不写库；没有就不显示这一块。
+  const recent = page === 1 ? await loadRecentConferences("ai4s", request.signal) : [];
+  return { data, recent };
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -233,7 +237,7 @@ export function Ai4sNewContent({ view, tab, domain, resetKey, onCommit }: {
   );
 }
 
-export function Ai4sPageContent({ data }: { data: Ai4sFeedResponse }) {
+export function Ai4sPageContent({ data, recent = [] }: { data: Ai4sFeedResponse; recent?: ConferenceSummary[] }) {
   // The list the reader sees: starts as the loader's data, replaced only by a successful controlled
   // update or a real navigation (which changes `data`).
   const [view, setView] = useState(data);
@@ -296,6 +300,8 @@ export function Ai4sPageContent({ data }: { data: Ai4sFeedResponse }) {
         })}
       </div>
 
+      {tab === "all" && <ConferenceRecent items={recent} scope="ai4s" />}
+
       <Ai4sNewContent view={view} tab={tab} domain={domain} resetKey={resetKey} onCommit={setView} />
 
       <div className={`transition-opacity duration-200 ${busy ? "opacity-50" : ""}`}>
@@ -333,6 +339,6 @@ export function Ai4sPageContent({ data }: { data: Ai4sFeedResponse }) {
 }
 
 export default function Ai4sPage() {
-  const { data } = useLoaderData<typeof loader>();
-  return <Ai4sPageContent data={data} />;
+  const { data, recent } = useLoaderData<typeof loader>();
+  return <Ai4sPageContent data={data} recent={recent} />;
 }

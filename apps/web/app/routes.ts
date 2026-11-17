@@ -22,6 +22,7 @@ export default [
   route("observing-guides", "routes/observing-guides.tsx"),
   route("nobel", "routes/nobel.ts"),
   route("ai4s", "routes/ai4s.tsx"),
+  route("conferences", "routes/conferences.tsx"),
   route("topics", "routes/topics.tsx"),
   route("topics/:slug", "routes/topic.tsx", { id: "topic" }),
   route("topics/:slug/page/:page", "routes/topic.tsx", { id: "topic-page" }),

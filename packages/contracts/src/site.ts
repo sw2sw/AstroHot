@@ -608,3 +608,66 @@ export interface TopicPage {
   pageCount: number;
   pageSize: number;
 }
+
+// —— Academic conferences (the shared hub and the two columns' recent entries) ——
+
+export type ConferenceScope = "all" | "astro" | "ai4s";
+/**
+ * Where a conference stands. The four date states come from the dates alone; `cancelled` and `postponed`
+ * are a person's state and outrank them — a cancelled event is never "ongoing", and one whose new dates
+ * are not settled is not shown as "ended" on the strength of dates it no longer holds.
+ */
+export type ConferencePhase = "ongoing" | "upcoming" | "ended" | "undated" | "cancelled" | "postponed";
+/** A human correction. Only an editor sets these; the clock never overwrites them. */
+export type ConferenceScheduleStatus = "scheduled" | "cancelled" | "postponed";
+export type ConferenceDeadlineKind = "registration" | "early_registration" | "abstract" | "paper" | "other";
+
+export interface ConferenceDeadlineView {
+  kind: ConferenceDeadlineKind;
+  /** YYYY-MM-DD, date-only: the day itself is still open, never closed early. */
+  date: string;
+  state: "open" | "today" | "closed";
+}
+
+/** The public notice a conference was read from: the reader's way back to the original. */
+export interface ConferenceNoticeView {
+  id: string;
+  title: string;
+  summary: string | null;
+  source: string;
+  url: string;
+  publishedAt: string | null;
+}
+
+export interface ConferenceSummary {
+  id: number;
+  name: string;
+  edition: string | null;
+  /** YYYY-MM-DD; null when the notice stated no date (shown as 待定, never invented). */
+  startDate: string | null;
+  endDate: string | null;
+  phase: ConferencePhase;
+  city: string | null;
+  venue: string | null;
+  online: boolean | null;
+  organizer: string | null;
+  officialUrl: string | null;
+  registrationUrl: string | null;
+  deadlines: ConferenceDeadlineView[];
+  scheduleStatus: ConferenceScheduleStatus;
+  /** Which column(s) the notices came from. It grants no selection or cross-listing. */
+  domain: "astro" | "ai4s" | "both";
+  notice: ConferenceNoticeView | null;
+  /** When the conference information was last verified (a notice or a manual correction). */
+  verifiedAt: string;
+}
+
+export interface ConferenceHubResponse {
+  scope: ConferenceScope;
+  items: ConferenceSummary[];
+  total: number;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  updatedAt: string | null;
+}

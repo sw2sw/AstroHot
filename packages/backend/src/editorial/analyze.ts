@@ -30,6 +30,8 @@ import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, norma
 import { newsImageAttribution } from "./image-attribution.ts";
 import { reviewFirstImage, type ImageReview } from "./image-review.ts";
 import { promptText, promptVersion } from "./prompts.ts";
+import { ConferenceExtractionSchema, normalizeConference, type GroundedConference } from "./conference.ts";
+import { projectConference } from "../content/conferences.ts";
 
 export { buildMaterial, loadAnalyzeInput, type AnalyzeInputArticle };
 
@@ -162,6 +164,9 @@ export const StructureSchema = z.object({
   tags: z.array(z.string()).max(12).catch([]),
   subjects: z.array(z.string()).max(6).catch([]),
   fact: FactSchema,
+  // A conference notice is read in the same structure call: no extra model request. Absent or null for
+  // every other article, which is what keeps older results compatible.
+  conference: ConferenceExtractionSchema.optional().catch(null),
 });
 
 /** The AI4S structure step: a discipline domain and an evidence-backed AI4A finding, no astronomy category/tags. */
@@ -176,6 +181,7 @@ export const Ai4sStructureSchema = z.object({
     referent: z.string().trim().max(80).nullable().catch(null),
   }).nullable().catch(null),
   fact: FactSchema,
+  conference: ConferenceExtractionSchema.optional().catch(null),
 });
 
 
@@ -193,6 +199,9 @@ const UnderstandSchema = z.object({
 const SummarizeSchema = z.object({ titleZh: z.string(), summaryZh: z.string(), bodyZh: z.string() });
 
 const ZH_COUNT = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
+
+/** The existing category tag a conference notice carries; no parallel 「会议」 tag is introduced. */
+const CONFERENCE_TAG = "学术会议";
 
 /** The structure step owns the public category and tags, as well as grouping evidence (filled from the pack's vocabulary). */
 export const STRUCTURE_SYSTEM = promptText("structure", {
@@ -229,6 +238,8 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
     category: data.category, tags: normalizeTags(data.tags),
     subjects: [...new Set(data.subjects.map((s) => s.trim().toLowerCase()).filter((s) => s in ENTITIES))],
     scope, fact,
+    // Recognised in this same call, grounded against the original (conference.ts).
+    conference: normalizeConference(data.conference, a),
   };
 }
 
@@ -272,7 +283,7 @@ const AI4A_DOMAINS = new Set<string>(["astronomy-astrophysics", "methods-tools"]
  * Anything else is null (unknown), not false — and never a claim of scientific verification.
  */
 export function normalizeAi4sStructure(data: z.infer<typeof Ai4sStructureSchema>, a: AnalyzeInputArticle) {
-  const base = normalizeStructure({ scope: data.scope, category: null, tags: [], subjects: [], fact: data.fact }, a);
+  const base = normalizeStructure({ scope: data.scope, category: null, tags: [], subjects: [], fact: data.fact, conference: null }, a);
   const visible = collapseWhitespace(buildMaterial(a));
   const originals = (a.xPost
     ? [String(a.xPost.text ?? a.title), String(a.xPost.quoted?.text ?? "")]
@@ -287,7 +298,7 @@ export function normalizeAi4sStructure(data: z.infer<typeof Ai4sStructureSchema>
   const ai4a = applies === true
     ? (grounded && referentGrounded && domainConsistent && supportsAstronomyApplication(evidence) ? true : null)
     : applies === false ? false : null;
-  return { ...base, domain: data.domain, ai4a };
+  return { ...base, domain: data.domain, ai4a, conference: normalizeConference(data.conference, a) };
 }
 
 export interface AnalysisRun {
@@ -311,7 +322,11 @@ export interface AnalysisRun {
     receiptIds: number[];
     reused: boolean;
   } | null;
-  structure: (ReturnType<typeof normalizeStructure> & { domain?: string | null; ai4a?: boolean | null; model: string; receiptId: number; reused: boolean }) | null;
+  /**
+   * The structure finding. `conference` is optional: results written before conference recognition
+   * existed carry no such field, and a judgement without one is a judgement with no notice.
+   */
+  structure: (Omit<ReturnType<typeof normalizeStructure>, "conference"> & { conference?: GroundedConference | null; domain?: string | null; ai4a?: boolean | null; model: string; receiptId: number; reused: boolean }) | null;
 }
 
 const isContentFilter = (error: unknown) => error instanceof ProviderRejectedError && !error.retryable && /contentFilter|"1301"/.test(error.message);
@@ -646,6 +661,12 @@ export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
     const display = ENTITIES[s]?.displayTag;
     if (display && !tags.includes(display)) tags.push(display);
   }
+  // A recognised notice is tagged here, not by the prompt: the AI4S structure step has no tag
+  // vocabulary of its own, so leaving it to the model would let the same notice carry the tag in one
+  // column and not in the other. Only a grounded notice reaches this point — ordinary material, a
+  // results report and an ambiguous paragraph never do, and no other tag is touched.
+  const conference = run.structure?.conference ?? null;
+  if (conference && !tags.includes(CONFERENCE_TAG)) tags.unshift(CONFERENCE_TAG);
   return {
     relevance,
     selected,
@@ -655,7 +676,7 @@ export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
     scoreRefused: run.scores?.refused ?? false,
     threshold,
     category: run.structure?.category ?? null,
-    tags,
+    tags: tags.slice(0, 6),
     subjects,
     titleZh,
     summaryZh,
@@ -665,6 +686,9 @@ export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
     contentScope,
     domain: run.structure?.domain ?? null,
     ai4a: run.structure?.ai4a ?? null,
+    // The grounded conference notice (or null). It is projected into its own tables; it never adds a
+    // selection score, a cross-listing or a second model call.
+    conference,
   };
 }
 
@@ -709,6 +733,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     ...(out.relevance === "unknown" ? { unknownReason: hasText ? "writing" : "material" } : {}),
     scope: out.scope, fact: out.fact,
     contentScope, domain: out.domain, ai4a: out.ai4a,
+    ...(out.conference ? { conference: out.conference } : {}),
   };
   const committed = await sql.begin(async (tx) => {
     const [current] = await tx<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${articleId} FOR UPDATE`;
@@ -723,6 +748,10 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     for (const id of receiptIds) await completeReceipt(tx, id);
     if (!stale) {
       await tx`UPDATE articles SET processing_state = ${out.relevance === "block" ? "blocked" : "analyzed"}, processing_error = NULL WHERE id = ${articleId}`;
+      // The conference projection belongs to the same transaction as the judgement that produced it:
+      // an interrupted run leaves neither a judgement without its conference nor a conference without
+      // its judgement. A stale run writes nothing at all.
+      await projectConference(tx, { articleId, revision: input.revision, contentScope, conference: out.conference });
     }
     return { analysisId: row!.id, stale };
   });
