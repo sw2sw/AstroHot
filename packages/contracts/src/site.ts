@@ -653,6 +653,8 @@ export interface ConferenceSummary {
   organizer: string | null;
   officialUrl: string | null;
   registrationUrl: string | null;
+  /** Editorially verified registration fee or an explicit pending/free note. */
+  meetingFee?: string | null;
   deadlines: ConferenceDeadlineView[];
   scheduleStatus: ConferenceScheduleStatus;
   /** Which column(s) the notices came from. It grants no selection or cross-listing. */

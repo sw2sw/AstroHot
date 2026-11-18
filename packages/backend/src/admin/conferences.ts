@@ -39,6 +39,7 @@ const FieldsSchema = z.object({
   timezone: z.string().trim().max(60).nullable().optional(),
   officialUrl: z.string().trim().url().max(500).nullable().optional(),
   registrationUrl: z.string().trim().url().max(500).nullable().optional(),
+  meetingFee: z.string().trim().min(1).max(200).nullable().optional(),
   /** Only a person states this: postponement and cancellation are never inferred from the clock. */
   scheduleStatus: z.enum(["scheduled", "cancelled", "postponed"]).optional(),
   /** A correction to the whole deadline list: the notices are no longer allowed to rewrite it. */
@@ -48,7 +49,7 @@ const FieldsSchema = z.object({
 const COLUMN: Record<string, string> = {
   name: "name", edition: "edition", startDate: "start_date", endDate: "end_date", city: "city", venue: "venue",
   online: "online", organizer: "organizer", timezone: "timezone", officialUrl: "official_url",
-  registrationUrl: "registration_url", scheduleStatus: "schedule_status", deadlines: "deadlines",
+  registrationUrl: "registration_url", scheduleStatus: "schedule_status", deadlines: "deadlines", meetingFee: "meeting_fee",
 };
 
 /** What clearing a field means. A NOT NULL column is never set to NULL; it returns to its default. */
