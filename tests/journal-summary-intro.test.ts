@@ -29,7 +29,7 @@ import { loadPool } from "@aihot/backend/publication/pool";
 import { readerNote } from "@aihot/backend/publication/rules";
 import type { AnalyzeInputArticle } from "@aihot/backend/editorial/input";
 import { renderContext } from "@aihot/backend/editorial/writing";
-import { collectSource } from "@aihot/backend/sources/collect";
+import { collectSource, noiseFiltered } from "@aihot/backend/sources/collect";
 import { unsupportedConfig } from "@aihot/backend/sources/config-keys";
 import { fetchRss } from "@aihot/backend/sources/rss";
 import type { SourceRow } from "@aihot/backend/sources/types";
@@ -706,6 +706,17 @@ test("A15：候选来源只写进配置，一律不启用生产采集", () => {
     // No collector key the RSS kind does not implement: a silent fallback would parse menus as articles.
     assert.deepEqual(unsupportedConfig("rss", entry.config), [], `${entry.id} carries a key the RSS collector ignores`);
   }
+  const filtered = (id: string, title: string, categories: string[] = [], excerpt: string | null = null) => {
+    const source = journals.find(s => s.id === id)!;
+    return noiseFiltered({ title, categories, excerpt, url: "https://example.test/news" }, source as SourceRow);
+  };
+  const nature = journals.find(s => s.id === "rss-journal-nature")!;
+  assert.equal(nature.config.feedUrl, "https://www.nature.com/subjects/astronomy-and-planetary-science/nature.rss");
+  assert.equal(filtered(nature.id, "Daily briefing: a roundup with a space item"), true);
+  assert.equal(filtered(nature.id, "New results on a variable star", [], "As noted in the daily briefing: new observations"), false);
+  assert.equal(filtered("rss-journal-new-scientist-space", "Satellite launch", ["Military"]), true);
+  assert.equal(filtered("rss-journal-astronomy-magazine", "A new guide", ["Ask Astro"]), true);
+  assert.equal(filtered("rss-journal-astronomy-magazine", "See a comet", ["Observing"]), false);
   // Two of the ten are kept as configuration only: the plan leaves them out of the first version.
   const laterOnly = journals.filter((s) => /aps-physics|nature-astronomy/.test(s.id));
   assert.equal(laterOnly.length, 2, "首版不接入的两份也保留了配置");

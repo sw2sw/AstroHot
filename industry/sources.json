@@ -260,7 +260,11 @@
         "cardImageAllowed": false,
         "_aihot": {
           "initialBackfillLimit": 3
-        }
+        },
+        "denyCategories": [
+          "Telescopes and Equipment",
+          "Ask Astro"
+        ]
       },
       "tier": "T2",
       "participation_mode": "editorial",
@@ -275,13 +279,18 @@
     },
     {
       "id": "rss-journal-nature",
-      "name": "Nature · 综合（RSS · 科学刊物，须先过滤天文相关性与文章类型）",
+      "name": "Nature · 天文与行星科学（RSS · 仍需天文相关性筛选）",
       "kind": "rss",
       "config": {
-        "feedUrl": "https://www.nature.com/nature.rss",
+        "feedUrl": "https://www.nature.com/subjects/astronomy-and-planetary-science/nature.rss",
         "cardImageAllowed": false,
         "_aihot": {
           "initialBackfillLimit": 3
+        },
+        "ingestNoiseFilter": {
+          "dropMarkersTitleOnly": [
+            "daily briefing:"
+          ]
         }
       },
       "tier": "T2",
@@ -348,7 +357,10 @@
         "cardImageAllowed": false,
         "_aihot": {
           "initialBackfillLimit": 3
-        }
+        },
+        "denyCategories": [
+          "Military"
+        ]
       },
       "tier": "T2",
       "participation_mode": "editorial",
