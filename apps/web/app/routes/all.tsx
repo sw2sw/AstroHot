@@ -16,6 +16,9 @@ import { PhoneBar } from "../components/shell/PhoneBar";
 import { isPhone, type Screen } from "../components/shell/screens";
 import { openSearch } from "../features/search/SearchOverlay";
 import { addRecentSearch } from "../lib/local-state";
+import { loadRecentConferences } from "../lib/conferences.server";
+import { ConferenceRecent } from "../features/conferences/Recent";
+import type { ConferenceSummary } from "@aihot/contracts/site";
 
 export const handle: Screen = { tab: "featured", name: "全部" };
 
@@ -34,7 +37,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
   // Past the last page of what there is: the last page, with the same search and filters.
   if (data.total > 0 && data.page > data.pageCount) throw redirect(pageHref(url.searchParams, data.pageCount));
-  return { data };
+  // 近期会议入口：只在第一页、非搜索时读一次公开接口；没有会议就没有这一块。
+  const recent = !q && page === 1 ? await loadRecentConferences("astro", request.signal) : [];
+  return { data, recent };
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -67,7 +72,7 @@ function pageHref(params: URLSearchParams, page: number) {
 }
 
 export default function AllPage() {
-  const { data } = useLoaderData<typeof loader>();
+  const { data, recent } = useLoaderData<typeof loader>();
   const [params] = useSearchParams();
   const navigation = useNavigation();
   const f = data.filters;
@@ -118,6 +123,8 @@ export default function AllPage() {
           <SearchField defaultValue={f.q ?? ""} keep={keep} />
         </div>
       </div>
+
+      {!f.q && <ConferenceRecent items={recent as ConferenceSummary[]} scope="astro" />}
 
       {f.q && (
         <div className="mb-3 mt-1 flex flex-wrap items-center justify-between gap-2 lg:mt-0">

@@ -8,6 +8,7 @@ import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
 import { loadAi4sFeed, parseAi4sQuery } from "@aihot/backend/publication/ai4s";
+import { loadConferenceHub, parseConferenceQuery } from "@aihot/backend/publication/conferences";
 import { loadObservingGuides } from "@aihot/backend/publication/observing-guides";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
@@ -110,6 +111,18 @@ export function registerSite(app: FastifyInstance) {
       throw new BadRequest((error as Error).message);
     }
     return sendJsonWithEtag(req, reply, await loadAi4sFeed(query), { etagPrefix: "ai4s", cacheControl: "public, max-age=60, s-maxage=60" });
+  }));
+
+  // 学术会议汇总（/conferences）：公开资格与新闻无关——会议不是精选，也不因会议而精选。
+  app.get("/api/site/conferences", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    let query;
+    try {
+      query = parseConferenceQuery(q);
+    } catch (error) {
+      throw new BadRequest((error as Error).message);
+    }
+    return sendJsonWithEtag(req, reply, await loadConferenceHub(query), { etagPrefix: "conf", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/items/:id", siteHandler(async (req, reply) => {
