@@ -46,8 +46,9 @@ test("the hub is a registered route reading the shared public API", () => {
 test("the phone 更多 page lists 学术会议 and no new top-level tab is added", async () => {
   const more = readFileSync(new URL("../app/routes/more.tsx", import.meta.url), "utf8");
   assert.match(more, /to: "\/conferences", label: "学术会议"/);
-  const nav = await vite.ssrLoadModule("/app/components/shell/nav.ts") as { SIDEBAR: Array<{ items: Array<{ to: string }> }> };
-  assert.equal(nav.SIDEBAR.flatMap((g) => g.items).some((i) => i.to === "/conferences"), false, "不新增主导航一级");
+  const nav = await vite.ssrLoadModule("/app/components/shell/nav.ts") as typeof import("../app/components/shell/nav");
+  assert.ok(nav.SIDEBAR.find((group) => group.title === "更多")?.items.some((item) => item.to === "/conferences" && item.label === "学术会议"), "桌面侧栏的更多分组可进入学术会议");
+  assert.equal(nav.SIDEBAR.filter((group) => group.items.some((item) => item.to === "/conferences")).length, 1);
 });
 
 test("a whole card is a button, carries no nested anchor, and states date, place and deadline", async () => {
@@ -63,6 +64,36 @@ test("an undated conference says 日期待定 instead of inventing a date", asyn
   const html = await render("card", { item: item({ startDate: null, endDate: null, phase: "undated" }), onOpen: () => {} });
   assert.match(html, /日期待定/);
   assert.doesNotMatch(html, /2026-11-24/);
+});
+
+test("hub cards keep the same labelled fields when deadlines are missing", async () => {
+  const row = item({ city: null, venue: "主会场", deadlines: [] });
+  for (const html of [await render("card", { item: row, onOpen: () => {} })]) {
+    assert.match(html, /会期.*地点.*报名截止.*投稿截止/);
+    assert.match(html, /地点<\/span>[^]*?主会场/);
+    assert.match(html, /报名截止<\/span>[^]*?未确认[^]*?投稿截止<\/span>[^]*?未确认/);
+  }
+  const html = await render("card", { item: item({ deadlines: [{ kind: "registration", date: "2026-11-28", state: "open" }] }), onOpen: () => {} });
+  assert.match(html, /报名截止<\/span>[^]*?2026-11-28[^]*?投稿截止<\/span>[^]*?未确认/);
+});
+
+test("cards expose participation information without embedding links inside the detail button", async () => {
+  const row = item({ officialUrl: null, notice: { ...item().notice!, url: "https://panshi-forum.tashan.ac.cn/" } });
+  const html = await render("card", { item: row, onOpen: () => {} });
+  assert.match(html, /官网.*查看官网.*报名方式.*在线注册.*投稿方式.*在线投稿/);
+  assert.doesNotMatch(html, /<a\s/);
+  const { conferenceAccess } = await vite.ssrLoadModule("/app/features/conferences/access.ts") as typeof import("../app/features/conferences/access");
+  assert.equal(conferenceAccess(row).submissionUrl, "https://panshi-forum.tashan.ac.cn/submit");
+  assert.equal(conferenceAccess(item({ officialUrl: "javascript:alert(1)", notice: null })).officialUrl, null);
+  assert.equal(conferenceAccess(item({ officialUrl: null, notice: { ...item().notice!, url: "https://example.org/news" } })).officialUrl, null);
+});
+
+test("fee distinguishes confirmed charges, free, pending and unknown", async () => {
+  for (const [meetingFee, expected] of [["1900 元/人", "1900 元/人"], ["免会务费", "免会务费"], ["待后续通知", "待后续通知"], [null, "不详"]] as const) {
+    const row = item({ meetingFee, notice: null });
+    const html = await render("card", { item: row, onOpen: () => {} });
+    assert.match(html, new RegExp(`会务费</span>[^<]*<span[^>]*>${expected}`));
+  }
 });
 
 test("a cancelled conference shows its manual state, and an online one says 线上", async () => {
@@ -97,12 +128,28 @@ test("B4 a cancelled or unsettled event is never shown as ongoing or ended", asy
   assert.doesNotMatch(page, /id="conf-upcoming"/);
 });
 
+test("recent prioritizes ongoing then the nearest dated meetings, with a 30-day Shanghai window", async () => {
+  const { selectRecentConferences } = await vite.ssrLoadModule("/app/lib/conferences.server.ts") as typeof import("../app/lib/conferences.server");
+  const now = new Date("2026-11-17T16:30:00Z"); // Nov 18 in Shanghai
+  const rows = [item({ id: 1, startDate: "2026-12-19" }), item({ id: 2, startDate: "2026-12-18" }), item({ id: 3, startDate: "2026-11-24" }), item({ id: 4, phase: "ongoing" }), item({ id: 5, phase: "ended" }), item({ id: 6, phase: "undated", startDate: null }), item({ id: 7, phase: "postponed" }), item({ id: 8, phase: "cancelled" })];
+  assert.deepEqual(selectRecentConferences(rows, now).map((c) => c.id), [4, 3]);
+  assert.deepEqual(selectRecentConferences(rows.filter((c) => c.id !== 4 && c.id !== 3), now).map((c) => c.id), [2]);
+});
+
 test("the recent entry renders at most what it is given, and nothing at all when empty", async () => {
   const empty = await render("recent", { items: [], scope: "astro" });
   assert.equal(empty, "");
-  const html = await render("recent", { items: [item(), item({ id: 2, name: "另一个会议", startDate: "2026-12-01", endDate: "2026-12-01", phase: "ongoing" })], scope: "astro" });
+  const items = [item(), item({ id: 2, name: "另一个会议", startDate: "2026-12-01", endDate: "2026-12-01", phase: "ongoing" }), item({ id: 3, name: "第三项会议" })];
+  const html = await render("recent", { items, scope: "astro" });
+  const ai4s = await render("recent", { items, scope: "ai4s" });
+  assert.equal(ai4s, html.replace('data-conf-recent="astro"', 'data-conf-recent="ai4s"').replaceAll('scope=astro', 'scope=ai4s'));
+  assert.doesNotMatch(html, /第三项会议/);
   assert.match(html, /近期学术会议/);
   assert.match(html, /查看全部/);
-  assert.match(html, /\/conferences\?scope=astro/);
+  assert.deepEqual([...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)].map((m) => m[1]), ["/conferences?scope=astro"]);
+  assert.match(html, /<a\b[^>]*>.*<ul\b.*<\/ul><\/a>/);
   assert.equal((html.match(/<li/g) ?? []).length, 2);
+  assert.doesNotMatch(html, /会务费|报名方式|投稿方式/);
+  assert.match(html, /未开始/);
+  assert.match(html, /进行中/);
 });

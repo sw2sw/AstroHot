@@ -12,7 +12,9 @@ import { EmptyState } from "../components/ui/Page";
 import { Pagination } from "../features/feed/DayList";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import type { Screen } from "../components/shell/screens";
-import { deadlineLabel, phaseBadge, placeLabel, rangeLabel } from "../features/conferences/format";
+import { deadlineLabel, phaseBadge, phaseTone, placeLabel, rangeLabel } from "../features/conferences/format";
+import { CardFields } from "../features/conferences/CardFields";
+import { conferenceAccess } from "../features/conferences/access";
 
 export const handle: Screen = { tab: "featured", name: "学术会议" };
 
@@ -61,7 +63,6 @@ function scopeHref(scope: ConferenceScope) {
 
 /** 整卡打开详情：按钮而不是链接，卡内不嵌套任何链接。 */
 export function ConferenceCard({ item, onOpen }: { item: ConferenceSummary; onOpen: (c: ConferenceSummary, el: HTMLElement) => void }) {
-  const place = placeLabel(item);
   const badge = phaseBadge(item);
   return (
     <li id={`conf-${item.id}`} className="min-w-0">
@@ -71,21 +72,9 @@ export function ConferenceCard({ item, onOpen }: { item: ConferenceSummary; onOp
         aria-haspopup="dialog"
         className="flex h-full w-full flex-col items-start gap-1.5 rounded-card border border-line-soft bg-surface px-3.5 py-3 text-left transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:bg-bg-sunk lg:px-4 lg:py-3.5"
       >
-        <span className="flex w-full flex-wrap items-center gap-1.5 text-[12px] text-ink-4">
-          <span className="num">{rangeLabel(item)}</span>
-          {badge && <span className={`rounded-full px-1.5 py-0.5 ${item.phase === "ongoing" ? "bg-accent/10 font-medium text-accent" : "bg-bg-sunk"}`}>{badge}</span>}
-        </span>
-        <span className="line-clamp-2 text-[15.5px] font-[650] leading-[1.5] text-ink lg:text-[16px]">{item.name}</span>
-        {place && <span className="text-[12.5px] text-ink-3">{place}</span>}
-        {item.deadlines.length > 0 && (
-          <span className="flex flex-wrap gap-x-2 gap-y-0.5 text-[12px] text-ink-4">
-            {item.deadlines.map((d) => (
-              <span key={d.kind} className={d.state === "closed" ? "text-ink-4 line-through decoration-1" : d.state === "today" ? "text-accent" : ""}>
-                {deadlineLabel(d)}
-              </span>
-            ))}
-          </span>
-        )}
+        <span className="min-h-[3em] break-words text-[15.5px] font-[650] leading-[1.5] text-ink lg:text-[16px]">{item.name}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[12px] font-medium ${phaseTone(item.phase)}`}>{badge}</span>
+        <CardFields item={item} />
       </button>
     </li>
   );
@@ -120,6 +109,7 @@ function ConferenceDialog({ item, onClose, opener }: { item: ConferenceSummary; 
   }, [opener]);
   const place = placeLabel(item);
   const badge = phaseBadge(item);
+  const access = conferenceAccess(item);
   return (
     <dialog
       ref={dialog}
@@ -132,7 +122,7 @@ function ConferenceDialog({ item, onClose, opener }: { item: ConferenceSummary; 
     >
       <div className="flex flex-wrap items-center gap-2 text-[12px] text-ink-4">
         <span className="num">{rangeLabel(item)}</span>
-        {badge && <span className={`rounded-full px-1.5 py-0.5 ${item.phase === "ongoing" ? "bg-accent/10 font-medium text-accent" : "bg-bg-sunk"}`}>{badge}</span>}
+        <span className={`rounded-full px-2 py-0.5 font-medium ${phaseTone(item.phase)}`}>{badge}</span>
       </div>
       <h2 id={titleId} className="mt-1.5 text-xl font-semibold leading-8">{item.name}{item.edition ? <span className="ml-2 text-[13px] font-normal text-ink-4">{item.edition}</span> : null}</h2>
       <dl className="mt-3 border-t border-line-soft pt-2">
@@ -149,8 +139,17 @@ function ConferenceDialog({ item, onClose, opener }: { item: ConferenceSummary; 
             </span>
           </Field>
         )}
-        {item.registrationUrl && <Field label="报名"><ExternalLink href={item.registrationUrl}>{item.registrationUrl}</ExternalLink></Field>}
-        {item.officialUrl && <Field label="官网"><ExternalLink href={item.officialUrl}>{item.officialUrl}</ExternalLink></Field>}
+        <Field label="官网">{access.officialUrl ? <ExternalLink href={access.officialUrl}>打开会议官网 ↗</ExternalLink> : "未确认"}</Field>
+        <Field label="报名方式">
+          {access.registrationInfo && <span className="block">{access.registrationInfo}</span>}
+          {access.registrationUrl ? <ExternalLink href={access.registrationUrl}>打开官方报名入口 ↗</ExternalLink> : !access.registrationInfo && "未确认"}
+        </Field>
+        <Field label="投稿方式">
+          {access.submissionInfo && <span className="block">{access.submissionInfo}</span>}
+          {access.submissionCutoff && <span className="block">截止：{access.submissionCutoff}</span>}
+          {access.submissionUrl ? <ExternalLink href={access.submissionUrl}>打开官方投稿入口 ↗</ExternalLink> : !access.submissionInfo && "未确认"}
+        </Field>
+        <Field label="会务费">{item.meetingFee ?? "不详"}</Field>
         <Field label="更新"><span className="num">{fullDateTime(item.verifiedAt)}</span></Field>
       </dl>
       {item.notice && (

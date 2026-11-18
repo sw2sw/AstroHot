@@ -53,6 +53,7 @@ type Row = {
   organizer: string | null;
   official_url: string | null;
   registration_url: string | null;
+  meeting_fee: string | null;
   deadlines: Array<{ kind: string; date: string | null }> | null;
   domain: "astro" | "ai4s" | "both";
   schedule_status: string;
@@ -205,7 +206,7 @@ export async function loadConferenceHub(query: Partial<ConferenceQuery>, databas
                          ORDER BY d->>'kind', s2.stated_at DESC NULLS LAST, s2.revision DESC, s2.article_id
                       ) kinds) END AS deadlines,
            p.eff_domain AS domain, p.schedule_status, p.updated_at, p.local_today::text AS local_today, p.phase,
-           p.notice_article AS notice_id, p.merged, p.manual_fields, count(*) OVER () AS total
+           p.notice_article AS notice_id, p.merged, p.manual_fields, p.meeting_fee, count(*) OVER () AS total
       FROM phased p
      ORDER BY
        CASE p.phase WHEN 'ongoing' THEN 0 WHEN 'upcoming' THEN 1 WHEN 'ended' THEN 2
@@ -242,6 +243,7 @@ export async function loadConferenceHub(query: Partial<ConferenceQuery>, databas
     organizer: r.organizer,
     officialUrl: r.official_url,
     registrationUrl: r.registration_url,
+    meetingFee: r.meeting_fee,
     // Each deadline is judged in the event's own day, which may already be tomorrow in Beijing.
     deadlines: deadlineView(r.deadlines ?? [], r.local_today),
     scheduleStatus: (["scheduled", "cancelled", "postponed"].includes(r.schedule_status) ? r.schedule_status : "scheduled") as ConferenceSummary["scheduleStatus"],

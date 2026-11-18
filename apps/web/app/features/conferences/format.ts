@@ -37,12 +37,13 @@ export function scheduleBadge(c: Pick<ConferenceSummary, "scheduleStatus">): str
  * 卡片上的状态徽章：人工状态优先于日期状态，一张卡只出一个状态。取消的会不再同时显示「进行中」，
  * 延期未定新的日期时也不显示「日期待定」以外的时钟结论。
  */
-export function phaseBadge(c: Pick<ConferenceSummary, "phase">): string | null {
-  switch (c.phase) {
-    case "cancelled": return "已取消";
-    case "postponed": return "已延期";
-    case "ongoing": return "进行中";
-    case "undated": return "日期待定";
-    default: return null;
-  }
+export function phaseBadge(c: Pick<ConferenceSummary, "phase">): string {
+  return { cancelled: "已取消", postponed: "已延期", ongoing: "进行中", undated: "日期待定", upcoming: "未开始", ended: "已结束" }[c.phase];
+}
+
+export function phaseTone(phase: ConferenceSummary["phase"]): string {
+  if (phase === "upcoming") return "bg-accent-soft text-accent-ink";
+  if (phase === "ongoing") return "bg-ok-soft text-ok-ink";
+  if (phase === "postponed" || phase === "cancelled") return "bg-amber-soft text-amber-ink";
+  return "bg-bg-sunk text-ink-3";
 }

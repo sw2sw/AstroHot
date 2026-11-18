@@ -9,6 +9,7 @@ import { projectConference } from "@aihot/backend/content/conferences";
 import { publishArticle } from "@aihot/backend/publication/publish";
 import { deadlineView, loadConferenceHub, loadRecentConferences } from "@aihot/backend/publication/conferences";
 import { setVisibility } from "@aihot/backend/admin/content";
+import { overrideConference } from "@aihot/backend/admin/conferences";
 import { conferenceIdentityKey, type GroundedConference } from "@aihot/backend/editorial/conference";
 
 const T = tag();
@@ -70,6 +71,20 @@ test("only a public, pool-eligible notice from an editorial source makes a confe
   assert.equal(names.includes("无摘要会议D"), false);
   assert.equal(hub.total, hub.items.length > 0 ? hub.total : 0);
   assert.ok(ok.conferenceId);
+});
+
+test("revising the fee updates the same conference and rejects stale editors", async () => {
+  const seeded = await seed({ name: "会务费修订测试会议", start: "2026-11-29" });
+  const id = seeded.conferenceId!;
+  const read = async () => (await loadConferenceHub({ scope: "all" })).items.find((c) => c.id === id)!;
+  const [{ version }] = await sql<[{ version: number }]>`SELECT version FROM conferences WHERE id = ${id}`;
+  assert.equal((await read()).meetingFee, null);
+  const pending = await overrideConference(id, { fields: { meetingFee: "待后续通知" }, version, reason: "初始通知" }, "tester");
+  assert.equal((await read()).meetingFee, "待后续通知");
+  await assert.rejects(overrideConference(id, { fields: { meetingFee: "免会务费" }, version, reason: "旧版本" }, "tester"), /已更新/);
+  await overrideConference(id, { fields: { meetingFee: "免会务费" }, version: Number(pending!.version), reason: "组委会更新" }, "tester");
+  assert.equal((await read()).meetingFee, "免会务费");
+  assert.equal((await read()).notice?.id, seeded.articleId);
 });
 
 test("the column filter is a notice's column, not the event's importance", async () => {
