@@ -28,7 +28,7 @@ export function autoGuidesStart(value = process.env.OBSERVING_GUIDES_AUTO_START_
 /** Match persisted RSS categories, never the generic observing section or translated keywords. */
 function weeklyColumnCondition() {
   return sql`(
-    (btrim(regexp_replace(s.name, '（[^（）]*）', '', 'g')) = 'Astronomy Magazine · News'
+    (btrim(regexp_replace(s.name, '（[^（）]*）', '', 'g')) IN ('Astronomy Magazine · News', 'Astronomy Magazine · The Sky This Week')
       AND a.url ~ '^https://(www[.])?astronomy[.]com/the-sky-this-week/[^/?#]+/?([?#].*)?$'
       AND a.title ~ '^The Sky This Week( from|:)')
     OR
