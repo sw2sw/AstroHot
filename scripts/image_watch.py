@@ -32,12 +32,14 @@ def esa_identity(value):
     # Mirror media/esa-image.ts; only exact same-image canonical renditions qualify.
     if not isinstance(value, str):
         return None
-    match = re.fullmatch(r'https://www\.esa\.int/var/esa/storage/images/(?:esa_multimedia/images/)?([0-9]{4})/(0[1-9]|1[0-2])/([a-z0-9]+(?:_[a-z0-9]+)*)/([0-9]+-[0-9]+-eng-GB)/([A-Za-z0-9]+(?:_[A-Za-z0-9]+)*?)(?:_article|_pillars)?\.jpg', value)
+    if re.fullmatch(r'https://media\.esa\.int/global/public/common/(?:misc|image)/[0-9]{4}/(?:0[1-9]|1[0-2])/([0-9]+)/image-thumb__\1__(?:fit_large/[a-z0-9]+(?:-[a-z0-9]+)*\.[a-f0-9]{8}\.webp|(?:mq_jpeg|hq_jpeg)/[a-z0-9]+(?:-[a-z0-9]+)*\.[a-f0-9]{8}\.jpg)', value):
+        return (None, value)
+    match = re.fullmatch(r'https://www\.esa\.int/var/esa/storage/images/(?:esa_multimedia/images/)?([0-9]{4})/(0[1-9]|1[0-2])/([a-z0-9]+(?:_[a-z0-9]+)*)/([0-9]+-[0-9]+-eng-GB)/([A-Za-z0-9]+(?:_[A-Za-z0-9]+)*?)(?:_article|_pillars|_card_full)?\.(jpg|png)', value)
     if not match or match[3] != match[5].lower():
         return None
-    year, month, slug, version, name = match.groups()
+    year, month, slug, version, name, ext = match.groups()
     return (f'https://www.esa.int/ESA_Multimedia/Images/{year}/{month}/{name}',
-            f'https://www.esa.int/var/esa/storage/images/esa_multimedia/images/{year}/{month}/{slug}/{version}/{name}.jpg')
+            f'https://www.esa.int/var/esa/storage/images/esa_multimedia/images/{year}/{month}/{slug}/{version}/{name}.{ext}')
 
 
 def anomalies(rows):
@@ -74,8 +76,13 @@ def anomalies(rows):
                     review.get('licenseUrl') != 'https://www.esa.int/ESA_Multimedia/Terms_and_conditions_of_use_of_images_and_videos_available_on_the_esa_website'):
                     reasons.append('逐图许可未核实')
                 credit = review.get('credit')
+                page = review.get('attributionUrl')
+                if identity and identity[0] is None:
+                    attribution_ok = isinstance(page, str) and bool(re.fullmatch(r'https://www\.esa\.int/media/[a-z0-9]+(?:-[a-z0-9]+)*', page)) and review.get('assetEvidence') == f'{identity[1]}|{page}'
+                else:
+                    attribution_ok = bool(identity and page == identity[0])
                 if (not isinstance(credit, str) or not credit.strip() or len(credit) > 2000 or
-                    not re.search(r'\bESA\b', credit) or not identity or review.get('attributionUrl') != identity[0]):
+                    not re.search(r'\bESA\b', credit) or not attribution_ok):
                     reasons.append('署名或图源缺失')
             elif review.get('rightsStatus') == 'unverified':
                 reasons.append('逐图许可未核实')

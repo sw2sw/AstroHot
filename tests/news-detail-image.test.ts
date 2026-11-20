@@ -22,6 +22,9 @@ const esaCandidate='https://www.esa.int/var/esa/storage/images/2018/10/elongated
 const esaCanonical='https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2018/10/elongated_cloud_on_mars_annotated/17836422-1-eng-GB/Elongated_cloud_on_Mars_annotated.jpg';
 const esaPage='https://www.esa.int/ESA_Multimedia/Images/2018/10/Elongated_cloud_on_Mars_annotated';
 const standardUrl='https://www.esa.int/ESA_Multimedia/Terms_and_conditions_of_use_of_images_and_videos_available_on_the_esa_website';
+const modernArticle='https://www.esa.int/articles/about-us/directorates/science/mars-express/in-the-shadow-of-volcanic-giants';
+const modernCandidate='https://media.esa.int/global/public/common/misc/2026/11/402640/image-thumb__402640__mq_jpeg/s331-col.ab2bb6e5.jpg';
+const modernPage='https://www.esa.int/media/tharsis-tholus-in-the-shadow-of-volcanic-giants';
 const pngStorage='https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2022/05/solar_orbiter_at_perihelion_27_march_2022/24071526-1-eng-GB/Solar_Orbiter_at_perihelion_27_March_2022';
 test('ESA PNG card and detail use verified original with exact credit, and reject stale JPG evidence',async()=>{
  const base=row;const candidate=pngStorage+'_card_full.png';
@@ -42,6 +45,14 @@ test('ESA card and detail proxy verified canonical image while binding original 
  try{const card=reviewedThumbnail(row);assert.ok(card);assert.equal(new URL(card.url,'https://local').searchParams.get('u'),esaCanonical);
  const d=await loadItemDetail(row.id);assert.equal(d.kind,'found');if(d.kind==='found'){assert.ok(d.item.newsImage);assert.equal(new URL(d.item.newsImage.url,'https://local').searchParams.get('u'),esaCanonical);assert.equal((d.item.newsImage as any).credit,esaReview.credit);}
  assert.equal(reviewedThumbnail({...row,media:[{kind:'image',url:'https://example.org/other.jpg'}]}),null);
+ }finally{row=base;}
+});
+test('modern ESA card and detail display the reviewed rendition only with complete same-asset evidence',async()=>{
+ const base=row;const review={url:modernCandidate,approved:true,category:'related',status:'approved',reason:'火星快车拍摄的相关火山观测图',rightsStatus:'verified',credit:'ESA/DLR/FU Berlin',license:'ESA Standard Licence',licenseUrl:standardUrl,attributionUrl:modernPage,assetEvidence:modernCandidate+'|'+modernPage};
+ row={...base,url:modernArticle,source_name:'ESA Space Science',media:[{kind:'image',url:modernCandidate}],image_review:review};
+ try{const card=reviewedThumbnail(row);assert.ok(card);assert.equal(new URL(card.url,'https://local').searchParams.get('u'),modernCandidate);assert.equal(card.credit,review.credit);assert.equal(card.attributionUrl,modernPage);
+ const d=await loadItemDetail(row.id);assert.equal(d.kind,'found');if(d.kind==='found'){assert.ok(d.item.newsImage);assert.equal(new URL(d.item.newsImage.url,'https://local').searchParams.get('u'),modernCandidate);}
+ for(const patch of [{assetEvidence:undefined},{assetEvidence:modernCandidate.replaceAll('402640','402999')+'|'+modernPage},{attributionUrl:'https://www.esa.int/media/other-image'},{rightsStatus:'unverified'},{status:'missing'}])assert.equal(reviewedThumbnail({...row,image_review:{...review,...patch}}),null);
  }finally{row=base;}
 });
 for(const patch of [{reason:undefined},{reason:''},{status:'missing'},{status:undefined},{credit:''},{credit:'Getty Images'},{license:'CC BY-SA 3.0 IGO',licenseUrl:'https://creativecommons.org/licenses/by-sa/3.0/igo/'},{rightsStatus:undefined},{licenseUrl:'https://evil.org/licence'},{license:'Unknown'},{canonicalUrl:'https://evil.org/image.jpg'},{canonicalUrl:esaCanonical.replace('17836422','999999')},{attributionUrl:esaPage.replace('annotated','other')}])test(`ESA reader rejects absent or mismatched persisted evidence: ${JSON.stringify(patch)}`,()=>{

@@ -316,11 +316,18 @@ function answerFirstSummaryLengthOk(summary: string, input: TranslateInput): boo
 
 export const isShortTweetInput = (input: TranslateInput) => input.sourceKind === "x_search" && isShortTweet(input.mainText || input.title);
 
+/** Match known template fields, not scientific notation or arbitrary angle brackets. */
+export function echoesWritingTemplate(text: string): boolean {
+  return /[<＜]\s*(?:(?:10\s*[-–—至]\s*(?:15|20)\s*字\s*)?中文标题|中文翻译|(?:80\s*[-–—至]\s*160\s*字\s*[、，,]?\s*最多\s*3\s*句的\s*)?中文摘要)\s*[>＞]/u.test(text);
+}
+
 /** The length rule (compacted without another call) and the identity guard, for any writing model. */
 export function finalizeCopy(input: TranslateInput, copy: { titleZh: string; summaryZh: string }) {
-  let summaryZh = copy.summaryZh;
+  const titleZh = echoesWritingTemplate(copy.titleZh)
+    ? (looksZh(input.title) && !echoesWritingTemplate(input.title) ? input.title : "") : copy.titleZh;
+  let summaryZh = echoesWritingTemplate(copy.summaryZh) ? "" : copy.summaryZh;
   if (!isShortTweetInput(input) && summaryZh && !answerFirstSummaryLengthOk(summaryZh, input)) summaryZh = compactAnswerFirstSummary(summaryZh);
-  return enforceIdentity(input, { titleZh: copy.titleZh, summaryZh });
+  return enforceIdentity(input, { titleZh, summaryZh });
 }
 
 // Title/summary prompts for items the content understanding does not write

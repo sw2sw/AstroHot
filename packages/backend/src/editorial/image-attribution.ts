@@ -9,6 +9,7 @@ export interface ImageAttribution {
   license?: string;
   licenseUrl?: string;
   canonicalUrl?: string;
+  assetEvidence?: string;
 }
 
 /** Exact official credit for this one candidate; neither suitability nor display permission. */
@@ -40,9 +41,10 @@ export async function newsImageAttribution(
 
 /** ESA storage paths are not licences: verify this image's official metadata once. */
 export async function esaScienceImageAttribution(articleUrl: string, candidateUrl: string): Promise<ImageAttribution | null> {
-  if (!/^https:\/\/www\.esa\.int\/(?:Science_Exploration|Our_Activities)\/Space_Science\/(?:[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*\/)*[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*$/.test(articleUrl) || /\s/.test(articleUrl)) return null;
   const identity = esaImageIdentity(candidateUrl);
   if (!identity) return null;
+  if (identity.kind === "modern") return modernEsaImageAttribution(articleUrl, identity);
+  if (!/^https:\/\/www\.esa\.int\/(?:Science_Exploration|Our_Activities)\/Space_Science\/(?:[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*\/)*[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*$/.test(articleUrl) || /\s/.test(articleUrl)) return null;
   const { attributionUrl, storage, canonicalUrl } = identity;
   const extension = canonicalUrl.endsWith(".png") ? "png" : "jpg";
   try {
@@ -69,6 +71,75 @@ export async function esaScienceImageAttribution(articleUrl: string, candidateUr
     if (!licence) return null;
     const canonical = [...document.querySelectorAll("a.dropdown__item[download]")].some((node) => node.getAttribute("href") === `${storage}.${extension}`);
     return { credit, attributionUrl, ...licence, ...(canonical ? { canonicalUrl } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+const ESA_FETCH_OPTIONS = { timeoutMs: 8000, maxBytes: 512 * 1024, maxRedirects: 0 } as const;
+const MODERN_ARTICLE = /^https:\/\/www\.esa\.int\/articles\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MODERN_MEDIA = /^https:\/\/www\.esa\.int\/media\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** New ESA pages do not encode their media-page URL in the rendition URL: prove both edges from official DOM. */
+async function modernEsaImageAttribution(
+  articleUrl: string,
+  identity: Extract<NonNullable<ReturnType<typeof esaImageIdentity>>, { kind: "modern" }>,
+): Promise<ImageAttribution | null> {
+  if (!MODERN_ARTICLE.test(articleUrl) || /\s/.test(articleUrl)) return null;
+  try {
+    const articleResponse = await guardedFetch(articleUrl, ESA_FETCH_OPTIONS);
+    if (articleResponse.status !== 200 || articleResponse.url !== articleUrl) return null;
+    const { document } = parseHTML(articleResponse.text());
+    const pages = [...document.querySelectorAll("a[href]")].flatMap((node) => {
+      const attributionUrl = node.getAttribute("href") ?? "";
+      const micrioId = node.closest(".articles-modules__full-image")?.querySelector("micr-io[id]")?.getAttribute("id") ?? "";
+      const visibleLabel = [...node.childNodes].filter((child) => child.nodeType !== 1 || !(child as typeof node).matches('.sr-only, [aria-hidden="true"]')).map((child) => child.textContent ?? "").join(" ");
+      return collapseWhitespace(visibleLabel) === "Open image" && MODERN_MEDIA.test(attributionUrl) && /^[A-Za-z0-9]+$/.test(micrioId)
+        ? [{ attributionUrl, micrioId }] : [];
+    }).slice(0, 4);
+    for (const { attributionUrl, micrioId } of pages) {
+      const attribution = await modernEsaMediaPage(attributionUrl, micrioId, identity);
+      if (attribution) return attribution;
+    }
+  } catch {
+    // Missing or ambiguous evidence is text-only; never guess a page from a title or slug.
+  }
+  return null;
+}
+
+async function modernEsaMediaPage(
+  attributionUrl: string,
+  micrioId: string,
+  identity: Extract<NonNullable<ReturnType<typeof esaImageIdentity>>, { kind: "modern" }>,
+): Promise<ImageAttribution | null> {
+  try {
+    const response = await guardedFetch(attributionUrl, ESA_FETCH_OPTIONS);
+    if (response.status !== 200 || response.url !== attributionUrl) return null;
+    const { document } = parseHTML(response.text());
+    if (document.querySelector('link[rel="canonical"]')?.getAttribute("href") !== attributionUrl) return null;
+    for (const node of document.querySelectorAll("footer, header, nav, script, style, .footer, #footer")) node.remove();
+    const main = document.querySelector("main, [role='main']") ?? document.body;
+    if (!main || !("innerText" in main) || typeof main.innerText !== "string" || /\b(?:all\s+rights\s+reserved|permission\s+(?:is\s+)?required|not\s+(?:covered|licensed)|third[-\s]+party)\b/i.test(main.innerText)) return null;
+    const modals = [...main.querySelectorAll('.interactive-media-modal--static')];
+    if (modals.length !== 1) return null;
+    const modal = modals[0]!;
+    const ids = [...modal.querySelectorAll('micr-io[id]')].map((node) => node.getAttribute('id'));
+    if (ids.length !== 1 || ids[0] !== micrioId) return null;
+    // A name shared by a hero image and a download is not same-asset evidence.
+    // Only use a rendition expressly offered by this exact official media panel.
+    if (![...modal.querySelectorAll('a[download][href]')].some((node) => {
+      const href = node.getAttribute('href');
+      return href === identity.canonicalUrl || href === `${identity.canonicalUrl}?dl`;
+    })) return null;
+    const sections = [...modal.querySelectorAll(".interactive-media-modal__credits-section")];
+    const field = (label: string) => {
+      const section = sections.find((node) => collapseWhitespace(node.querySelector(".interactive-media-modal__credits-label")?.textContent ?? "") === label);
+      return section ? collapseWhitespace(section.querySelector(".interactive-media-modal__credits-text")?.textContent ?? "") : "";
+    };
+    const credit = field("Credits");
+    if (!credit || credit.length > 2000 || !/\bESA\b/.test(credit)) return null;
+    if (field("Licence") !== "CC BY-SA 3.0 IGO or ESA Standard Licence") return null;
+    return { credit, attributionUrl, ...ESA_IMAGE_LICENSES[0], assetEvidence: `${identity.storage}|${attributionUrl}` };
   } catch {
     return null;
   }

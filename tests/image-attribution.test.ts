@@ -1,5 +1,6 @@
 // Offline only: outbound HTTP and analysis providers are replaced before imports.
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import { beforeEach, mock, test } from "node:test";
 import { MockAgent, setGlobalDispatcher } from "undici";
@@ -25,10 +26,15 @@ let finalUrl = pageUrl;
 let status = 200;
 let fetchError = false;
 const fetchCalls: Array<{ url: string; options: any }> = [];
+const fetchFixtures = new Map<string, string>();
 mock.module(new URL("../packages/backend/src/lib/http-fetch.ts", import.meta.url).href, { namedExports: {
   guardedFetch: async (url: string, options: any) => {
     fetchCalls.push({ url, options });
     if (fetchError) throw new Error("offline timeout");
+    if (fetchFixtures.has(url)) {
+      const body = fetchFixtures.get(url)!;
+      return { status: 200, url, headers: new Headers(), body: Buffer.from(body), text: () => body };
+    }
     return { status, url: finalUrl, headers: new Headers(), body: Buffer.from(html), text: () => html };
   },
 } });
@@ -57,7 +63,7 @@ const article: import("../packages/backend/src/editorial/input.ts").AnalyzeInput
   bodyText: "Webb released a new observation of stars.", excerpt: null, xPost: null,
   media: [{ kind: "image", url: candidateUrl }], source: { name: "ESA Webb", kind: "rss", tier: "T1", firstParty: true },
 };
-beforeEach(() => { html = fixture; finalUrl = pageUrl; status = 200; fetchError = false; fetchCalls.length = 0; modelCalls.length = 0; modelError = null; imageFetches.length = 0; });
+beforeEach(() => { html = fixture; finalUrl = pageUrl; status = 200; fetchError = false; fetchCalls.length = 0; fetchFixtures.clear(); modelCalls.length = 0; modelError = null; imageFetches.length = 0; });
 
 for (const value of [null, {}, 'yes', { approved: 'true', category: 'related', reason: 'ok' }, { approved: true, category: 'related', reason: '' }, { approved: true, category: 'related', reason: 'ok', depiction: 'fake' }]) {
   test(`malformed review stays explicitly invalid without extra calls: ${JSON.stringify(value)}`, async () => {
@@ -432,6 +438,59 @@ test('ESA first-image model input uses only the official same-identity canonical
   assert.deepEqual(imageFetches, [result?.imageReview?.canonicalUrl]);
   assert.equal(result?.imageReview?.url, esaCandidate);
   assert.equal(fetchCalls.length, 1); assert.equal(modelCalls.length, 1);
+});
+const modernArticle = 'https://www.esa.int/articles/about-us/directorates/science/mars-express/in-the-shadow-of-volcanic-giants';
+const modernCandidate = 'https://media.esa.int/global/public/common/misc/2026/11/402640/image-thumb__402640__mq_jpeg/s331-col.ab2bb6e5.jpg';
+const modernPage = 'https://www.esa.int/media/tharsis-tholus-in-the-shadow-of-volcanic-giants';
+const modernArticleFixture = await readFile(new URL('./fixtures/esa-modern-article.html', import.meta.url), 'utf8');
+const modernMediaFixture = await readFile(new URL('./fixtures/esa-modern-media.html', import.meta.url), 'utf8');
+function modernFixtures(articleHtml = modernArticleFixture, mediaHtml = modernMediaFixture) {
+  fetchFixtures.set(modernArticle, articleHtml);
+  fetchFixtures.set(modernPage, mediaHtml);
+}
+test('modern ESA article binds its exact candidate to an official media page and licensed source asset', async () => {
+  modernFixtures();
+  assert.deepEqual(await newsImageAttribution(modernArticle, modernCandidate), {
+    credit: 'ESA/DLR/FU Berlin', attributionUrl: modernPage, license: 'ESA Standard Licence',
+    licenseUrl: 'https://www.esa.int' + standardPath,
+    assetEvidence: modernCandidate+'|' + modernPage,
+  });
+  assert.deepEqual(fetchCalls.map((call) => call.url), [modernArticle, modernPage]);
+  for (const call of fetchCalls) assert.deepEqual(call.options, { timeoutMs: 8000, maxBytes: 512 * 1024, maxRedirects: 0 });
+});
+test('modern ESA does not borrow a linked media licence for the unlisted hero rendition', async () => {
+  modernFixtures();
+  assert.equal(await newsImageAttribution(modernArticle, 'https://media.esa.int/global/public/common/misc/2026/11/402636/image-thumb__402636__fit_large/s331-col.e505cd3f.webp'), null);
+});
+test('modern ESA strict review persists rights evidence for the same reviewed candidate', async () => {
+  modernFixtures();
+  const result = await runUnderstand({ ...article, url: modernArticle, media: [{ kind: 'image', url: modernCandidate }] });
+  assert.equal(result?.imageReview?.approved, true);
+  assert.equal(result?.imageReview?.rightsStatus, 'verified');
+  assert.equal(result?.imageReview?.credit, 'ESA/DLR/FU Berlin');
+  assert.equal(result?.imageReview?.attributionUrl, modernPage);
+  assert.equal(result?.imageReview?.assetEvidence, modernCandidate+'|' + modernPage);
+  assert.deepEqual(imageFetches, [modernCandidate]);
+  assert.equal(modelCalls.length, 1);
+});
+for (const [name, articleHtml, mediaHtml] of [
+  ['no media link in article', modernArticleFixture.replace(modernPage, 'https://example.org/image'), modernMediaFixture],
+  ['different source asset', modernArticleFixture, modernMediaFixture.replaceAll('s331-col', 'different-image')],
+  ['same basename but different exact rendition', modernArticleFixture, modernMediaFixture.replace('402640/image-thumb__402640__mq_jpeg/s331-col.ab2bb6e5.jpg', '402998/image-thumb__402998__mq_jpeg/s331-col.1b2bb6e5.jpg')],
+  ['different interactive asset', modernArticleFixture, modernMediaFixture.replace('id="dPNxo"', 'id="other"')],
+  ['missing licence', modernArticleFixture, modernMediaFixture.replace('CC BY-SA 3.0 IGO or ESA Standard Licence', 'Licence unavailable')],
+  ['explicit restriction', modernArticleFixture, modernMediaFixture.replace('</main>', '<p>This image is not licensed for reuse; permission required.</p></main>')],
+  ['restriction between adjacent paragraphs', modernArticleFixture, modernMediaFixture.replace('</main>', '<p>Details</p><p>Permission required</p><p>Licence</p></main>')],
+] as const) test(`modern ESA rejects ${name}`, async () => {
+  modernFixtures(articleHtml, mediaHtml);
+  assert.equal(await newsImageAttribution(modernArticle, modernCandidate), null);
+});
+for (const candidate of [
+  modernCandidate.replace('https:', 'http:'), modernCandidate.replace('media.esa.int', 'media.esa.int.evil.org'),
+  modernCandidate.replace('/402640/image-thumb__402640__', '/402640/image-thumb__402999__'), modernCandidate + '?x=1',
+]) test(`modern ESA rejects untrusted or malformed candidate without HTTP: ${candidate}`, async () => {
+  assert.equal(await newsImageAttribution(modernArticle, candidate), null);
+  assert.equal(fetchCalls.length, 0);
 });
 const noirlabArticle = 'http://noirlab.edu/public/news/noirlab2624/';
 const noirlabCandidate = 'https://storage.noirlab.edu/media/archives/images/screen/noirlab2624a.jpg';
