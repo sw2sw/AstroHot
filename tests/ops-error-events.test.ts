@@ -244,7 +244,7 @@ test("operational error recording acceptance", async (t) => {
     const outside = path.join(config.dataDir, "outside");
     mkdirSync(outside, { recursive: true, mode: 0o700 });
     const { rmSync } = await import("node:fs");
-    const { symlink, rm, lstat } = await import("node:fs/promises");
+    const { symlink, rm, lstat, unlink } = await import("node:fs/promises");
     const lines = await captureStderr(async () => {
       // 1) The evidence DIRECTORY itself is a link to outside: refused, nothing lands out there.
       rmSync(evidenceDir, { recursive: true, force: true });
@@ -254,7 +254,8 @@ test("operational error recording acceptance", async (t) => {
       });
       assert.equal(dirRefused.recorded, false);
       // Restore the REAL directory for the file-level cases.
-      rmSync(evidenceDir);
+      assert.ok((await lstat(evidenceDir)).isSymbolicLink());
+      await unlink(evidenceDir);
       mkdirSync(evidenceDir, { recursive: true, mode: 0o700 });
       // 2) A content-addressed evidence file is a link to outside: refused, outside untouched.
       const body = "<feed>link-target</feed>";

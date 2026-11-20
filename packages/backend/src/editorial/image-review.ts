@@ -10,7 +10,7 @@ export type ImageReview = z.infer<typeof ImageSuitabilitySchema> & {
   status: "missing" | "invalid" | "approved" | "image-rejected" | "no-vision" | "download-failed" | "provider-rejected" | "rights-unverified";
   suitabilityStatus?: "approved";
   rightsStatus?: "verified" | "unverified";
-  license?: string; licenseUrl?: string; canonicalUrl?: string;
+  license?: string; licenseUrl?: string; canonicalUrl?: string; assetEvidence?: string;
   url: string; credit?: string; caption?: string; attributionUrl?: string;
 };
 

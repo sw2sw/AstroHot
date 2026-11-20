@@ -110,7 +110,10 @@ test("collect enqueues durably with no worker alive; real workers then drain the
   await until(async () => {
     const rows = await sql<{ body_status: string }[]>`SELECT body_status FROM articles WHERE id = ANY(${ids}::text[])`;
     const pubs = (await sql<{ n: number }[]>`SELECT count(*)::int n FROM publications WHERE article_id = ANY(${ids}::text[])`)[0]!.n;
-    return rows.length === 2 && rows.every((r) => r.body_status === "unconfirmed") && pubs === 2;
+    if (rows.length !== 2 || !rows.every((r) => r.body_status === "unconfirmed") || pubs !== 2) return false;
+    // pg-boss settles the job after the handler commits the publication and returns.
+    const done = await sql<{ name: string; n: number }[]>`SELECT name, count(DISTINCT data->>'articleId')::int n FROM pgboss.job WHERE name IN (${QUEUES.extractBody}, ${QUEUES.analyze}) AND data->>'articleId' = ANY(${ids}::text[]) AND state = 'completed' GROUP BY name`;
+    return done.length === 2 && done.every((r) => r.n === ids.length);
   });
 
   // 3. Every transition went through a consumed job: the extract and analyze jobs are completed in pgboss.

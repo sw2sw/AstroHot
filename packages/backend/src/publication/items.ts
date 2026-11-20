@@ -181,10 +181,18 @@ export function reviewedThumbnail(row: ItemRow, preset: "thumb" | "body" = "thum
     const identity = esaImageIdentity(first.url);
     if (!identity || review.status !== "approved" || typeof review.reason !== "string" || !review.reason.trim() || review.reason.length > 400 ||
       typeof review.credit !== "string" || !review.credit.trim() || review.credit.length > 2000 || !/\bESA\b/.test(review.credit) ||
-      review.rightsStatus !== "verified" || review.attributionUrl !== identity.attributionUrl ||
+      review.rightsStatus !== "verified" ||
       !ESA_IMAGE_LICENSES.some((policy) => review.license === policy.license && review.licenseUrl === policy.licenseUrl)) return null;
-    if (review.canonicalUrl !== undefined) {
-      if (review.canonicalUrl !== identity.canonicalUrl) return null;
+    if (identity.kind === "legacy") {
+      if (review.attributionUrl !== identity.attributionUrl) return null;
+      if (review.canonicalUrl !== undefined) {
+        if (review.canonicalUrl !== identity.canonicalUrl) return null;
+        display = { ...first, url: identity.canonicalUrl, poster: undefined };
+      }
+    } else {
+      if (typeof review.attributionUrl !== "string" || !/^https:\/\/www\.esa\.int\/media\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(review.attributionUrl) ||
+        review.assetEvidence !== `${identity.storage}|${review.attributionUrl}` ||
+        review.canonicalUrl !== undefined && review.canonicalUrl !== identity.canonicalUrl) return null;
       display = { ...first, url: identity.canonicalUrl, poster: undefined };
     }
   }

@@ -120,6 +120,20 @@ test('stored RSS source notes and case-varying S&T column categories match witho
   }
 });
 
+test('Astronomy Magazine weekly guides accept both the general-news and dedicated column feeds', async () => {
+  await setup();
+  await sql`INSERT INTO sources (id, name, kind, participation_mode)
+    VALUES ('astro-general','Astronomy Magazine · News（RSS · 科学刊物，含观测指南）','rss','editorial'),
+           ('astro-column','Astronomy Magazine · The Sky This Week（RSS · 科学刊物，观测指南）','rss','editorial'),
+           ('astro-other','Astronomy Magazine · Unrelated（RSS）','rss','editorial')`;
+  await add('astro-general-issue');
+  await add('astro-column-issue', { publication: { source_id: 'astro-column' } });
+  await add('astro-other-issue', { publication: { source_id: 'astro-other' } });
+  assert.deepEqual((await loadObservingGuides([])).guides.map(g => g.id), ['astro-column-issue', 'astro-general-issue']);
+  assert.equal((await loadObservingGuides([])).guides.find(g => g.id === 'astro-column-issue')!.sourceName,
+    'Astronomy Magazine · The Sky This Week');
+});
+
 test('real site API handler returns bounded DTO, ETag and invalid-cursor 400 without body redistribution', async () => {
   await setup(); await add('public-sky', { sky: true });
   const app=Fastify(); registerSite(app);

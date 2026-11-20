@@ -22,7 +22,7 @@ import { buildMaterial, firstImageOf, firstImagePart, loadAnalyzeInput, type Ana
 import { pageFetchable } from "../content/extract.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import {
-  buildArticlePrompt, buildLongTweetPrompt, buildShortTweetPrompt, finalizeCopy, isShortTweetInput, looksZh, materialHeading, MAX_BODY_CHARS, missingEvidence,
+  buildArticlePrompt, buildLongTweetPrompt, buildShortTweetPrompt, echoesWritingTemplate, finalizeCopy, isShortTweetInput, looksZh, materialHeading, MAX_BODY_CHARS, missingEvidence,
   needsShortTweetTranslation, parseTranslateOutput, PREFILTER_SYSTEM, prefilterUser, translateInputOf, AI4S_UNDERSTAND_SYSTEM, UNDERSTAND_SYSTEM, understandUser,
   type IdentityGuard,
 } from "./writing.ts";
@@ -196,7 +196,8 @@ const UnderstandSchema = z.object({
   summaryZh: z.string().trim().min(1).max(4000),
 });
 
-const SummarizeSchema = z.object({ titleZh: z.string(), summaryZh: z.string(), bodyZh: z.string() });
+const modelCopy = z.string().refine((text) => !echoesWritingTemplate(text), "Model echoed a writing template placeholder");
+export const SummarizeSchema = z.object({ titleZh: modelCopy, summaryZh: modelCopy, bodyZh: modelCopy });
 
 const ZH_COUNT = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
 

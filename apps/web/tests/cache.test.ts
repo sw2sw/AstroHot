@@ -7,6 +7,7 @@ import type { AddressInfo } from "node:net";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
+import { parseHTML } from "linkedom";
 
 let web: ChildProcess;
 let origin: string;
@@ -29,6 +30,9 @@ const api = createServer((req, res) => {
     return res.end(JSON.stringify({ filters, cards: [], nextCursor: null, dayCounts: [], hot: null }));
   }
   if (url.pathname === "/api/site/hot") return res.end(JSON.stringify({ entries: [] }));
+  if (url.pathname === "/api/site/stories") return res.end(JSON.stringify(url.searchParams.get("page") === "2"
+    ? { entries: [], hasNext: false }
+    : { entries: [{ publicId: "85a8684e-b20e-4bca-bdba-64330c096b63", title: "归档测试事件", latestReportAt: "2026-10-02T00:00:00Z" }], hasNext: true }));
   if (url.pathname === "/api/site/echo-client") return res.end(JSON.stringify({ forwarded: req.headers["x-forwarded-for"], real: req.headers["x-real-ip"] }));
   if (url.pathname === "/api/site/items/long-lived") return res.end(JSON.stringify({ id: "long-lived", title: "t" }));
   if (url.pathname === "/api/site/contact") return res.end(JSON.stringify({ wechatQr: "/qr.png", feishuQr: "/qr.png" }));
@@ -71,6 +75,25 @@ after(async () => {
   }
   api.closeAllConnections();
   await new Promise<void>((resolve) => api.close(() => resolve()));
+});
+
+test("热点页在空榜时仍有往期入口，目录链接原事件，并可翻页返回", async () => {
+  async function page(path: string) {
+    const response = await fetch(origin + path);
+    assert.equal(response.status, 200, path);
+    return parseHTML(await response.text()).document;
+  }
+  const hot = await page("/hot");
+  assert.ok([...hot.querySelectorAll('a[href="/hot/archive"]')].some((a) => a.textContent?.includes("往期事件")));
+  const archive = await page("/hot/archive");
+  const entry = archive.querySelector('a[href="/story/85a8684e-b20e-4bca-bdba-64330c096b63"]');
+  assert.equal(entry?.querySelector("span")?.textContent, "归档测试事件");
+  assert.equal(entry?.querySelector("time")?.textContent, "2026-10-02");
+  assert.ok(archive.querySelector('a[href="/hot/archive?page=2"]'));
+  const older = await page("/hot/archive?page=2");
+  assert.match(older.body.textContent!, /暂无可浏览的事件/);
+  assert.ok(older.querySelector('a[href="/hot/archive"]'));
+  assert.equal(older.querySelector('a[href="/hot/archive?page=3"]'), null);
 });
 
 test("public route subsets produce the same complete navigation data; filters still differ", async () => {
