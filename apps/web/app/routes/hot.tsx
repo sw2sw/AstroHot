@@ -281,6 +281,10 @@ export default function HotPage() {
         )}
       </header>
 
+      <div className="mb-4 flex justify-end">
+        <Link to="/hot/archive" className="inline-flex min-h-11 items-center px-3 text-[14px] font-semibold text-accent hover:underline">往期事件 →</Link>
+      </div>
+
       {!lead ? (
         <div className="card rounded-sheet">
           <EmptyState title="暂时没有热点">还没有足够多来源共同讨论的事件。</EmptyState>

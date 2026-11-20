@@ -20,7 +20,7 @@ import { loadSiteStats } from "@aihot/backend/site/stats";
 import { itemAvailability } from "@aihot/backend/publication/availability";
 import { listTopicSummaries, loadTopicPage } from "@aihot/backend/publication/topics";
 import { registerFeedback } from "./feedback.ts";
-import { loadHot, loadStoryDetail, resolveStory } from "@aihot/backend/publication/stories";
+import { loadHot, loadStoryArchive, loadStoryDetail, resolveStory } from "@aihot/backend/publication/stories";
 import { listReports, loadReport, reportNavigation, loadReportNavigation, loadReportMonth, type ReportKind } from "@aihot/backend/publication/reports";
 import { loadSiteCodexResetPage, loadSiteCodexResetDay } from "@aihot/backend/publication/monitor";
 import { codexResetVersion } from "@aihot/backend/monitor/read";
@@ -189,6 +189,14 @@ export function registerSite(app: FastifyInstance) {
   app.get("/api/site/hot", siteHandler(async (req, reply) => {
     const data = await loadHot();
     return sendJsonWithEtag(req, reply, data, { etagPrefix: "hot", cacheControl: "public, max-age=30, s-maxage=30" });
+  }));
+
+  app.get("/api/site/stories", siteHandler(async (req, reply) => {
+    const raw = (req.query as { page?: unknown }).page ?? "1";
+    if (typeof raw !== "string" || !/^[1-9]\d{0,5}$/.test(raw)) {
+      return sendProblem(req, reply, { status: 400, code: "bad_request", detail: "invalid page" });
+    }
+    return sendJsonWithEtag(req, reply, await loadStoryArchive(Number(raw)), { etagPrefix: "story-archive", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/stories/:publicId", siteHandler(async (req, reply) => {

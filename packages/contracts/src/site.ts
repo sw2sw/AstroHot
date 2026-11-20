@@ -304,6 +304,11 @@ export interface HotEntryView {
   cover: { url: string; srcSet?: string; width: number | null; height: number | null } | null;
 }
 
+export interface StoryArchiveResponse {
+  entries: { publicId: string; title: string; latestReportAt: string }[];
+  hasNext: boolean;
+}
+
 export interface HotResponse {
   computedAt: string | null;
   windowHours: number;

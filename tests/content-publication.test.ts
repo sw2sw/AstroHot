@@ -7,7 +7,7 @@ import { pickRepresentative, representativePriority } from "@aihot/backend/publi
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
-import { loadStoryDetail, v1Story } from "@aihot/backend/publication/stories";
+import { loadStoryArchive, loadStoryDetail, v1Story } from "@aihot/backend/publication/stories";
 import { candidates } from "@aihot/backend/reports/edition";
 import { composeStoryDigest, DIGEST_PROMPT_VERSION, DIGEST_SYSTEM, DigestSchema } from "@aihot/backend/events/digest";
 import { chatJson } from "@aihot/backend/providers/llm";
@@ -63,6 +63,25 @@ async function report(sourceId: string, group: Awaited<ReturnType<typeof story>>
   await sql`INSERT INTO fact_articles (fact_id,article_id,role,evidence) VALUES (${group.factId},${id},${opts.role ?? 'report'},'Tasks consume usage.')`;
   return id;
 }
+
+test("story archive lists old public stories but not withdrawn, mention-only, merged or AI4S-only stories", async () => {
+  const src = await source("archive", "T1");
+  const cases = await Promise.all(["old", "withdrawn", "mentioned", "merged", "AI4S"].map((title) => story(title)));
+  const [old, withdrawn, mentioned, merged, ai4s] = cases as [typeof cases[number], typeof cases[number], typeof cases[number], typeof cases[number], typeof cases[number]];
+  await report(src, old, { title: "Archive public", hours: 400 });
+  const w = await report(src, withdrawn, { title: "Hidden", hours: 399 });
+  await report(src, mentioned, { title: "Mention", hours: 398, role: "mention" });
+  await report(src, merged, { title: "Alias", hours: 397 });
+  const a = await report(src, ai4s, { title: "AI4S only", hours: 396 });
+  await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${w}`;
+  await sql`UPDATE stories SET merged_into = ${old.storyId} WHERE id = ${merged.storyId}`;
+  await sql`UPDATE publications SET content_scope = 'ai4s' WHERE article_id = ${a}`;
+  const archive = await loadStoryArchive(1, now);
+  assert.deepEqual(archive.entries.filter((row) => cases.some((x) => x.storyPublicId === row.publicId)), [
+    { publicId: old.storyPublicId, title: "old", latestReportAt: at(400).toISOString() },
+  ]);
+  assert.ok(await loadStoryDetail(old.storyId, now));
+});
 
 test("source tier and event ownership are separate; mentions of an entity do not establish authority", () => {
   const row = { body_mode: "full" as const, score: 70, timeline_at: now, source_tier: "T2", publisher_role: null, owner_entity_id: null, fact_subject: "ESO" };

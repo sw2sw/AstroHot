@@ -1,6 +1,6 @@
 // Stories (events) and the hot ranking through the public read layer. The website sees heat values;
 // v1 and MCP only see ranks and counts.
-import type { HeatPoint, HotResponse, StoryDetail, StoryReportView } from "@aihot/contracts/site";
+import type { HeatPoint, HotResponse, StoryArchiveResponse, StoryDetail, StoryReportView } from "@aihot/contracts/site";
 import { SITE } from "@aihot/industry/site";
 import { sql } from "../db.ts";
 import { cachedByKey, SHARED_ONLY } from "../lib/cache.ts";
@@ -80,6 +80,22 @@ async function storyReports(storyId: number, now: Date): Promise<ReportRow[]> {
     JOIN sources s ON s.id = p.source_id
     WHERE f.story_id = ${storyId} AND ${storyReportCondition(now)}
     ORDER BY p.article_id, (fa.role = 'primary') DESC, (fa.role <> 'mention') DESC, f.id`;
+}
+
+export async function loadStoryArchive(page: number, now = new Date()): Promise<StoryArchiveResponse> {
+  const size = 30;
+  const rows = await sql<{ public_id: string; title: string; latest_at: Date }[]>`
+    SELECT st.public_id::text, st.title, max(coalesce(p.published_at, p.discovered_at)) AS latest_at
+    FROM stories st JOIN facts f ON f.story_id = st.id
+    JOIN fact_articles fa ON fa.fact_id = f.id JOIN publications p ON p.article_id = fa.article_id
+    JOIN sources s ON s.id = p.source_id
+    WHERE st.merged_into IS NULL AND ${storyReportCondition(now)} AND ${evidenceCondition()}
+    GROUP BY st.id ORDER BY latest_at DESC, st.public_id DESC
+    LIMIT ${size + 1} OFFSET ${(page - 1) * size}`;
+  return {
+    entries: rows.slice(0, size).map((row) => ({ publicId: row.public_id, title: row.title, latestReportAt: row.latest_at.toISOString() })),
+    hasNext: rows.length > size,
+  };
 }
 
 function reportView(r: ReportRow): StoryReportView {
