@@ -280,6 +280,7 @@
       "config": {
         "feedUrl": "https://www.nature.com/nature.rss",
         "cardImageAllowed": false,
+        "sharedPrefilter": true,
         "_aihot": {
           "initialBackfillLimit": 3
         }
@@ -302,6 +303,7 @@
       "config": {
         "feedUrl": "https://www.scientificamerican.com/platform/syndication/rss/",
         "cardImageAllowed": false,
+        "sharedPrefilter": true,
         "_aihot": {
           "initialBackfillLimit": 3
         }
@@ -455,6 +457,44 @@
       "tags": [
         "SYNTHETIC",
         "AI4S"
+      ],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "anthropic-science",
+      "name": "Anthropic · Science（官方科学栏目；无官方 RSS，/science 主入口 + Discovery 补漏）",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.anthropic.com/science",
+        "supplementaryUrl": "https://www.anthropic.com/search?topic=discovery",
+        "adapter": "anthropic_science",
+        "parseMode": "html",
+  "allowUrlPrefixes": [
+   "https://www.anthropic.com/research/",
+   "https://www.anthropic.com/news/"
+  ],
+  "allowUrlRegex": "^https://www\\.anthropic\\.com/(research/(?!team/)[^/?#]+|news/[^/?#]+)",
+        "publishedAtUtcOffset": "+00:00",
+        "detail": {
+          "maxFetches": 5,
+          "publishedAtUtcOffset": "+00:00"
+        },
+        "sharedPrefilter": true,
+        "cardImageAllowed": false,
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
+      },
+      "tier": "T1",
+      "first_party": true,
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": [
+        "官方",
+        "AI4S",
+        "科学"
       ],
       "site_fulltext": false,
       "syndicate_fulltext": false,

@@ -127,7 +127,10 @@ function ai4sDomainLabel(item: Pick<Ai4sItemSummary, "ai4a" | "domain">): string
  * link is in the detail (the shared item page), so the card carries no external anchor. */
 export function Ai4sCard({ item, read, onOpen, at }: { item: Ai4sItemSummary; read: boolean; onOpen: (id: string) => void; at: string }) {
   const open = () => {
-    rememberPreview(item);
+    // The shared article page renders the article's astronomy projection (its home column). This
+    // card's selection and score belong to the AI4S column, so a cross-listed row must not cache them
+    // as that page's chrome — only a native AI4S row's card is the same projection.
+    if (!item.crossListed) rememberPreview(item);
     // Recorded before the navigation, so the list that comes back can put focus on this card again.
     rememberOrigin(item.id);
     onOpen(item.id);

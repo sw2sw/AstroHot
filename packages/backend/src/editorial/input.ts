@@ -40,6 +40,8 @@ export interface AnalyzeInputArticle {
     ownerEntityId?: string | null;
     /** The source asks for the article page (fetchPublicContent, detail pages, web listings). */
     fetchesBody?: boolean;
+    /** The source runs the shared astronomy/AI4S prefilter instead of the single-column one. */
+    sharedPrefilter?: boolean;
   };
   /** Stored Chinese translation of the body (e.g. a full post whose original was truncated). */
   translationZh?: string | null;
@@ -82,6 +84,7 @@ export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputA
     source: {
       name: row.source_name, kind: row.source_kind, tier: row.tier, firstParty: row.tier === "T1", tags: row.source_tags, ownerEntityId: row.owner_entity_id,
       fetchesBody: row.config?.fetchPublicContent === true || !!row.config?.detail || row.source_kind === "web_list",
+      sharedPrefilter: row.config?.sharedPrefilter === true,
     },
     translationZh: row.translation_zh,
     contentScope: row.content_scope,

@@ -15,7 +15,8 @@ export function releasedCondition(now: Date) {
 
 /**
  * Astronomy surfaces list astronomy material, plus any AI4S row an editor explicitly cross-listed.
- * The AI4S column has its own predicates below; the two never read each other's rows by accident.
+ * The AI4S column has its own predicates below; each column's predicates name their own column and
+ * may admit the other column's row only through an explicit cross-list flag.
  */
 export function astroScopeCondition() {
   return sql`(p.content_scope = 'astro' OR p.astro_cross_listed)`;
@@ -53,14 +54,27 @@ export function seatedCondition(now: Date) {
   return sql`p.visibility = 'public' AND p.selected AND p.seat AND p.visible_after <= ${now} AND ${astroScopeCondition()}`;
 }
 
-/** The AI4S column's own listed set: its rows only, public, eligible and released. */
+/**
+ * The AI4S column's own listed set: its own rows plus any astronomy article whose own AI4S
+ * dimension passed in its latest judgement (ai4s_cross_listed). Public, eligible and released.
+ * A cross-listed row keeps its astronomy content_scope, so the astronomy read layer above never
+ * loses it.
+ */
 export function ai4sListedCondition(now: Date) {
-  return sql`p.content_scope = 'ai4s' AND p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)}`;
+  return sql`(p.content_scope = 'ai4s' OR p.ai4s_cross_listed) AND p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)}`;
 }
 
-/** The AI4S column's own selected set (manual overrides while auto-selection is off). */
+/**
+ * The AI4S column's own selected set. Each column selects for itself: a native AI4S row uses
+ * `selected`, a cross-listed astronomy row uses `ai4s_selected`, and neither reads the other's
+ * state — an article can be selected in one column and only listed in the other. Each also keeps its
+ * own release moment: a row only the AI4S column selected has no astronomy `visible_after` to borrow,
+ * so its release is `ai4s_visible_after` (stamped at publish time beside its own selection).
+ */
 export function ai4sSelectedCondition(now: Date) {
-  return sql`p.content_scope = 'ai4s' AND p.visibility = 'public' AND p.selected AND p.visible_after <= ${now}`;
+  return sql`((p.content_scope = 'ai4s' AND p.selected AND p.visible_after <= ${now})
+    OR (p.ai4s_cross_listed AND p.ai4s_selected AND p.ai4s_visible_after <= ${now}))
+    AND p.visibility = 'public'`;
 }
 
 /** The report was published from a composite (multi-topic) analysis: it only mentions facts. */

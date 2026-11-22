@@ -33,17 +33,41 @@ export function parseAi4sQuery(query: Record<string, unknown>): Ai4sQuery {
   return { tab, domain, page };
 }
 
-type Ai4sItemRow = ItemRow & { domain: string | null; ai4a: boolean | null };
-const AI4S_ITEM_COLUMNS = sql`${ITEM_COLUMNS}, p.domain, p.ai4a`;
+type Ai4sItemRow = ItemRow & {
+  domain: string | null;
+  ai4a: boolean | null;
+  /** This column's own selection — never the astronomy one. */
+  ai4s_own_selected: boolean;
+  /** This column's own score; null for a cross-listed row, which holds no AI4S-scored judgement. */
+  ai4s_own_score: string | number | null;
+  /** Keeps its astronomy home and is listed here through the cross-list. */
+  cross_listed: boolean;
+};
+
+/**
+ * The card belongs to the AI4S column, so the selection and the score it shows are that column's own.
+ * A native AI4S row reads the publication's own judgement; a cross-listed astronomy row neither
+ * inherits the astronomy selection nor wears its score — it has no AI4S score, so it shows none.
+ * (The article's home page still renders its astronomy projection; only this column's DTO changes.)
+ */
+const AI4S_ITEM_COLUMNS = sql`${ITEM_COLUMNS}, p.domain, p.ai4a,
+  (p.content_scope = 'ai4s' AND p.selected) OR (p.content_scope = 'astro' AND p.ai4s_cross_listed AND p.ai4s_selected) AS ai4s_own_selected,
+  CASE WHEN p.content_scope = 'ai4s' THEN p.score END AS ai4s_own_score,
+  (p.content_scope = 'astro' AND p.ai4s_cross_listed) AS cross_listed`;
 
 function toAi4sItem(row: Ai4sItemRow): Ai4sItemSummary {
   const card = toFeedItemSummary(row);
   return {
     ...card,
+    selected: row.ai4s_own_selected,
+    score: row.ai4s_own_score === null ? null : Math.round(Number(row.ai4s_own_score)),
+    // The "why selected" note belongs to the column that selected it.
+    reason: row.ai4s_own_selected ? card.reason : null,
     originalTitle: row.original_title,
     links: { original: row.url },
     domain: row.domain,
     ai4a: row.ai4a,
+    crossListed: row.cross_listed,
     accessNote: readerNote({ coverage: row.coverage, access: row.access, fullText: row.body_mode === "full" }),
   };
 }
