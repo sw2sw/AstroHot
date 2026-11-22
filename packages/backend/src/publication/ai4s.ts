@@ -80,10 +80,8 @@ export async function loadAi4sFeed(query: Partial<Ai4sQuery>, database?: Db): Pr
   const page = Math.min(Math.max(query.page ?? 1, 1), AI4S_MAX_PAGES);
   const scope = tab === "selected" ? ai4sSelectedCondition(now) : ai4sListedCondition(now);
   const domainFilter = domain === "astro" ? sql`AND p.ai4a IS TRUE` : domain ? sql`AND p.domain = ${domain}` : sql``;
-  // The selected tab puts verified astronomy applications first; both tabs keep time order within.
-  const order = tab === "selected"
-    ? sql`ORDER BY p.ai4a DESC NULLS LAST, p.timeline_at DESC, p.article_id DESC`
-    : sql`ORDER BY p.timeline_at DESC, p.article_id DESC`;
+  // Both tabs are chronological; AI4A remains a filter and a card badge, not a ranking signal.
+  const order = sql`ORDER BY p.timeline_at DESC, p.article_id DESC`;
   const offset = (page - 1) * AI4S_PAGE_SIZE;
   const cap = AI4S_MAX_PAGES * AI4S_PAGE_SIZE;
   const rows = await db<Ai4sItemRow[]>`
