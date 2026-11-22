@@ -61,6 +61,12 @@ export const AI4S_ANALYZE_PROMPT_VERSION = [
   AI4S_PROMPT_VERSIONS.prefilter, AI4S_PROMPT_VERSIONS.score, AI4S_PROMPT_VERSIONS.understand, AI4S_PROMPT_VERSIONS.summarize, AI4S_PROMPT_VERSIONS.structure,
 ].join("+");
 
+// The shared prefilter for mixed-topic science sources: one paid request returns both relevance
+// judgements, and the route below decides which analysis chain runs. Its version is new, so a receipt
+// written by the old single-column prompt can never be read back as a two-dimension answer.
+export const SHARED_PREFILTER_VERSION = promptVersion("shared-prefilter");
+export const SHARED_PREFILTER_SYSTEM = promptText("shared-prefilter");
+
 // Scoring
 
 /** Independent score calls per article; their sum decides, their mean (floored) is shown. */
@@ -140,6 +146,61 @@ const PrefilterSchema = z.object({
   label: z.preprocess((v) => String(v ?? "").trim().toUpperCase(), z.enum(["PASS", "BLOCK", "UNKNOWN"])),
   reason: z.string().max(200).catch(""),
 });
+
+/** One answer, two independent labels. No `catch` on the enums: a malformed answer must fail loudly. */
+const SharedPrefilterSchema = z.object({
+  astronomy: z.preprocess((v) => String(v ?? "").trim().toUpperCase(), z.enum(["PASS", "BLOCK", "UNKNOWN"])),
+  ai4s: z.preprocess((v) => String(v ?? "").trim().toUpperCase(), z.enum(["PASS", "BLOCK", "UNKNOWN"])),
+  reason: z.string().max(300).catch(""),
+});
+
+export type SharedLabel = "PASS" | "BLOCK" | "UNKNOWN";
+export interface SharedPrefilterResult {
+  astronomy: SharedLabel;
+  ai4s: SharedLabel;
+  reason: string;
+  model: string;
+  receiptId: number;
+  reused: boolean;
+  version: string;
+}
+
+export interface SharedRoute {
+  /** Which column's analysis chain runs; null when neither runs. */
+  scope: "astro" | "ai4s" | null;
+  /** Both labels say BLOCK: the item is excluded like any other irrelevant material. */
+  excluded: boolean;
+  /** An UNKNOWN that must not be read as "no": no paid analysis, the item waits for more material. */
+  held: boolean;
+  /** Both labels PASS: the astronomy chain runs, and one AI4S structure call records domain/AI4A. */
+  extraAi4sStructure: boolean;
+}
+
+/**
+ * The routing table. A BLOCK from one dimension never discards the other's PASS; an UNKNOWN is never
+ * turned into a no, but it also must not launch a paid chain on a dimension the model could not judge
+ * — a mixed source's item waits for material instead. A single-dimension UNKNOWN beside a definite
+ * BLOCK keeps the existing prefilter semantics for that column (UNKNOWN goes on), because no AI4S
+ * recall can be lost when AI4S itself was explicitly ruled out.
+ */
+export function routeSharedPrefilter(s: Pick<SharedPrefilterResult, "astronomy" | "ai4s">): SharedRoute {
+  const { astronomy: a, ai4s: s4 } = s;
+  if (a === "PASS" && s4 === "BLOCK") return { scope: "astro", excluded: false, held: false, extraAi4sStructure: false };
+  if (a === "BLOCK" && s4 === "PASS") return { scope: "ai4s", excluded: false, held: false, extraAi4sStructure: false };
+  if (a === "PASS" && s4 === "PASS") return { scope: "astro", excluded: false, held: false, extraAi4sStructure: true };
+  if (a === "BLOCK" && s4 === "BLOCK") return { scope: null, excluded: true, held: false, extraAi4sStructure: false };
+  // An UNKNOWN on the AI4S side beside a definite astronomy PASS: the astronomy chain still runs.
+  if (a === "PASS" && s4 === "UNKNOWN") return { scope: "astro", excluded: false, held: false, extraAi4sStructure: false };
+  // AI4S is explicitly relevant while astronomy is unknown: keep the AI4S recall, do not claim astronomy.
+  if (a === "UNKNOWN" && s4 === "PASS") return { scope: "ai4s", excluded: false, held: false, extraAi4sStructure: false };
+  // Astronomy unknown beside a definite AI4S BLOCK: existing astronomy semantics let UNKNOWN go on.
+  if (a === "UNKNOWN" && s4 === "BLOCK") return { scope: "astro", excluded: false, held: false, extraAi4sStructure: false };
+  // The remaining UNKNOWN combinations cannot be resolved without more material.
+  return { scope: null, excluded: false, held: true, extraAi4sStructure: false };
+}
+
+/** The column the current run belongs to, once a shared prefilter has decided the route. */
+export type EffectiveScope = "astro" | "ai4s";
 
 const FactSchema = z
   .object({
@@ -304,6 +365,14 @@ export function normalizeAi4sStructure(data: z.infer<typeof Ai4sStructureSchema>
 
 export interface AnalysisRun {
   prefilter: { label: "PASS" | "BLOCK" | "UNKNOWN"; reason: string; model: string; receiptId: number; reused: boolean };
+  /** Present only for a mixed-topic source: both judgements and the route they produced. */
+  shared?: SharedPrefilterResult;
+  /** The column this run writes to; a shared prefilter may move an AI4S-only item out of astronomy. */
+  effectiveScope?: EffectiveScope;
+  /** The item waits for more material: no score, structure or writing was bought. */
+  held?: string;
+  /** Both dimensions PASS: the AI4S structure finding kept beside the astronomy one. */
+  ai4sStructure?: { domain: string | null; ai4a: boolean | null; model: string; receiptId: number; reused: boolean } | null;
   /**
    * The independent score calls and the tier threshold they are held against; absent when the material
    * is not scored. `refused`: the model's content filter declined it, so it is not selected.
@@ -370,6 +439,54 @@ async function runPrefilter(a: AnalyzeInputArticle, opts: StepOpts): Promise<Ana
   // A BLOCK without material to back it counts as UNKNOWN (which goes on).
   const label = res.data.label === "BLOCK" && missingEvidence(a) ? "UNKNOWN" : res.data.label;
   return { label, reason: res.data.reason, model: res.model, receiptId: res.receiptId, reused: res.reused };
+}
+
+/**
+ * The shared prefilter: one request, both labels. A BLOCK without material is downgraded to UNKNOWN
+ * per dimension, exactly as the single-column prefilter does; the model's other label is untouched.
+ */
+async function runSharedPrefilter(a: AnalyzeInputArticle, opts: StepOpts): Promise<SharedPrefilterResult> {
+  const model = await modelFor("prefilter");
+  checkAnalysisRunning();
+  const res = await chatJson({
+    model,
+    purpose: "prefilter_article",
+    subject: subjectOf(a),
+    promptVersion: SHARED_PREFILTER_VERSION,
+    system: SHARED_PREFILTER_SYSTEM,
+    user: prefilterUser(a),
+    schema: SharedPrefilterSchema,
+    temperature: 0,
+    maxTokens: 512,
+    attemptTag: opts.attemptTag,
+  });
+  const missing = missingEvidence(a);
+  const settle = (label: SharedLabel): SharedLabel => (label === "BLOCK" && missing ? "UNKNOWN" : label);
+  return {
+    astronomy: settle(res.data.astronomy), ai4s: settle(res.data.ai4s), reason: res.data.reason,
+    model: res.model, receiptId: res.receiptId, reused: res.reused, version: SHARED_PREFILTER_VERSION,
+  };
+}
+
+export async function runSharedSelectionPrefilter(
+  a: AnalyzeInputArticle,
+  opts: StepOpts = {},
+  onReceipt?: ReceiptObserver,
+): Promise<SharedPrefilterResult> {
+  try {
+    const result = await runSharedPrefilter(a, opts);
+    onReceipt?.(result.receiptId);
+    return result;
+  } catch (error) {
+    const receiptId = observableReceiptId(error);
+    if (receiptId !== null) onReceipt?.(receiptId);
+    throw error;
+  }
+}
+
+/** The same material, read as the other column: the step functions branch on contentScope. */
+function asScope(a: AnalyzeInputArticle, scope: EffectiveScope): AnalyzeInputArticle {
+  return a.contentScope === scope ? a : { ...a, contentScope: scope };
 }
 
 /** The production prefilter step, exposed separately so SelectBench can preserve partial receipt evidence. */
@@ -619,6 +736,7 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
 /** Runs the steps on the material as it is (or reuses their receipts) without writing business results. */
 export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun> {
   checkAnalysisRunning();
+  if (a.source.sharedPrefilter) return runSharedAnalysis(a, opts);
   const prefilter = await runSelectionPrefilter(a, opts);
   // UNKNOWN is let through (its material is as complete as it will get); BLOCK stops here.
   if (prefilter.label === "BLOCK") return { prefilter, scores: null, writing: null, structure: null };
@@ -639,14 +757,59 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
   }
 }
 
+/**
+ * A mixed-topic source: one shared prefilter decides the column, then the same chain runs on that
+ * column's prompts. Both PASS keeps astronomy as the primary column (the astronomy surface would
+ * otherwise silently lose the item) and adds one AI4S structure call for its domain and AI4A finding;
+ * the article is never duplicated and the astronomy/AI4S prefilter is never run twice.
+ */
+async function runSharedAnalysis(a: AnalyzeInputArticle, opts: StepOpts): Promise<AnalysisRun> {
+  const shared = await runSharedSelectionPrefilter(a, opts);
+  const route = routeSharedPrefilter(shared);
+  const label: "PASS" | "BLOCK" | "UNKNOWN" = route.excluded ? "BLOCK" : route.held ? "UNKNOWN" : "PASS";
+  const prefilter = { label, reason: shared.reason, model: shared.model, receiptId: shared.receiptId, reused: shared.reused };
+  if (route.excluded) return { prefilter, shared, effectiveScope: "astro", scores: null, writing: null, structure: null };
+  if (route.held || !route.scope) {
+    return { prefilter, shared, effectiveScope: "astro", held: "shared-prefilter", scores: null, writing: null, structure: null };
+  }
+  const scope = route.scope;
+  const work = asScope(a, scope);
+  const structure = runStructure(work, opts).then((value) => ({ value }), (error: unknown) => ({ error }));
+  // Both PASS: the AI4S finding is recorded beside the astronomy one, from the same material.
+  const extra = route.extraAi4sStructure
+    ? runStructure(asScope(a, "ai4s"), opts).then((value) => ({ value }), (error: unknown) => ({ error }))
+    : null;
+  try {
+    const scores = await runSelectionScores(work, opts);
+    const sum = scores && !scores.refused && scores.values.length === SCORE_CALLS ? scores.values.reduce((total, v) => total + v, 0) : null;
+    const near = sum !== null && (sum >= scores!.threshold * SCORE_CALLS || sum > UNDERSTAND_FLOOR * SCORE_CALLS);
+    const s = await structure;
+    if ("error" in s) throw s.error;
+    const extraResult = extra ? await extra : null;
+    if (extraResult && "error" in extraResult) throw extraResult.error;
+    const writing = (near ? await runUnderstand(work, opts) : null) ?? (await runSummarize(work, opts));
+    const ai4sStructure = extraResult && "value" in extraResult
+      ? {
+        domain: extraResult.value.domain ?? null, ai4a: extraResult.value.ai4a ?? null,
+        model: extraResult.value.model, receiptId: extraResult.value.receiptId, reused: extraResult.value.reused,
+      }
+      : null;
+    return { prefilter, shared, effectiveScope: scope, scores, writing, structure: s.value, ai4sStructure };
+  } finally {
+    await structure;
+    if (extra) await extra;
+  }
+}
+
 /** One judgement from the steps: the selection rule, the reader-facing copy and the structure. */
 export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
   const label = run.prefilter.label;
   const titleZh = collapseWhitespace(run.writing?.titleZh ?? "");
   const summaryZh = (run.writing?.summaryZh ?? "").trim();
   // Past the prefilter (PASS or UNKNOWN) an item is relevant, but without a usable Chinese title and
-  // summary it cannot be published: it waits.
-  const relevance = label === "BLOCK" ? "block" : run.writing && (!titleZh || !summaryZh) ? "unknown" : "pass";
+  // summary it cannot be published: it waits. An item the shared prefilter could not resolve waits
+  // with its reason recorded rather than being read as irrelevant.
+  const relevance = run.held ? "unknown" : label === "BLOCK" ? "block" : run.writing && (!titleZh || !summaryZh) ? "unknown" : "pass";
   // Selected when the two scores add up to twice the tier threshold; the mean, floored, is the score
   // shown (it never decides a half point on its own). The AI4S column does not auto-select until a
   // sample calibration is authorised (industry/selection.ts), so its items stay candidates only.
@@ -685,8 +848,13 @@ export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
     scope: run.structure?.scope ?? "unknown",
     fact: run.structure?.fact ?? null,
     contentScope,
-    domain: run.structure?.domain ?? null,
-    ai4a: run.structure?.ai4a ?? null,
+    domain: run.structure?.domain ?? run.ai4sStructure?.domain ?? null,
+    ai4a: run.structure?.ai4a ?? run.ai4sStructure?.ai4a ?? null,
+    // What the shared prefilter decided, kept with the judgement so the route is auditable even when
+    // the row's primary column later changes.
+    sharedPrefilter: run.shared
+      ? { astronomy: run.shared.astronomy, ai4s: run.shared.ai4s, reason: run.shared.reason, version: run.shared.version }
+      : null,
     // The grounded conference notice (or null). It is projected into its own tables; it never adds a
     // selection score, a cross-listing or a second model call.
     conference,
@@ -713,7 +881,9 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
   // Its page first; extraction queues the analysis again (normally the queue already routed it there).
   if (waitsForPage(input)) return { analysisId: null, stale: false, needsBody: true, output: null, receiptIds: [], reused: true };
   const run = await runAnalysis(input, opts);
-  const contentScope = input.contentScope === "ai4s" ? "ai4s" : "astro";
+  // The shared prefilter may have moved an AI4S-only item out of the astronomy column; everything
+  // below (prompt versions, projection, publication) follows the column the run actually used.
+  const contentScope = run.effectiveScope ?? (input.contentScope === "ai4s" ? "ai4s" : "astro");
   const out = normalizeAnalysis(run, contentScope);
   const receiptIds = [
     run.prefilter.receiptId, ...(run.scores?.receiptIds ?? []), ...(run.writing?.receiptIds ?? []), ...(run.structure ? [run.structure.receiptId] : []),
@@ -731,9 +901,12 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     coverage: input.coverage ?? null, access: input.access ?? null, contentKind: input.contentKind ?? null,
     // An item held back for lack of material is not the same finding as an irrelevant one, and neither
     // is a model answer that carried no usable copy.
-    ...(out.relevance === "unknown" ? { unknownReason: hasText ? "writing" : "material" } : {}),
+    ...(out.relevance === "unknown" ? { unknownReason: run.held ?? (hasText ? "writing" : "material") } : {}),
     scope: out.scope, fact: out.fact,
     contentScope, domain: out.domain, ai4a: out.ai4a,
+    ...(out.sharedPrefilter ? { sharedPrefilter: out.sharedPrefilter } : {}),
+    // Both dimensions passed: the AI4S finding kept beside the astronomy judgement.
+    ...(run.ai4sStructure ? { ai4sStructure: run.ai4sStructure } : {}),
     ...(out.conference ? { conference: out.conference } : {}),
   };
   const committed = await sql.begin(async (tx) => {
@@ -748,6 +921,11 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
       RETURNING id`;
     for (const id of receiptIds) await completeReceipt(tx, id);
     if (!stale) {
+      // A shared prefilter may decide AI4S is the only column this material belongs to. The column is
+      // written in the judgement's own transaction and bound to the revision it was judged on.
+      if (contentScope !== (input.contentScope === "ai4s" ? "ai4s" : "astro")) {
+        await tx`UPDATE articles SET content_scope = ${contentScope} WHERE id = ${articleId} AND revision = ${input.revision}`;
+      }
       await tx`UPDATE articles SET processing_state = ${out.relevance === "block" ? "blocked" : "analyzed"}, processing_error = NULL WHERE id = ${articleId}`;
       // The conference projection belongs to the same transaction as the judgement that produced it:
       // an interrupted run leaves neither a judgement without its conference nor a conference without

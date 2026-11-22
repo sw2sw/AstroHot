@@ -20,7 +20,7 @@ const item = (over: Partial<Ai4sItemSummary> = {}): Ai4sItemSummary => ({
   source: { name: "SYNTHETIC Science" }, publishedAt: "2026-11-15T22:00:01.000Z", timelineAt: "2026-11-15T22:00:01.000Z",
   category: null, tags: [], score: null, selected: false, channel: "news", x: null,
   originalTitle: "A lattice proof of the Standard Model", links: { original: "https://example.invalid/ai4s/research-demo" },
-  domain: null, ai4a: null, accessNote: null, ...over,
+  domain: null, ai4a: null, crossListed: false, accessNote: null, ...over,
 });
 
 async function renderCard(it: Ai4sItemSummary) {
@@ -142,4 +142,29 @@ test("the list remembers which card opened an article, so closing it returns foc
   const src = readFileSync(new URL("../app/routes/ai4s.tsx", import.meta.url), "utf8");
   assert.match(src, /rememberOrigin\(item\.id\)/, "the card records itself before navigating");
   assert.match(src, /useReturnFocus\(\)/, "the list claims the record and restores focus");
+});
+
+test("a cross-listed card shows this column's own selection and never the astronomy score", async () => {
+  // Astronomy selected and scored; the AI4S column only lists it. The card must not show a 精选 mark
+  // or a score it does not have — the API already sends the column's own values, and the card paints them.
+  const listed = await renderCard(item({ crossListed: true, selected: false, score: null }));
+  assert.match(listed, /格点定义证明/);
+  assert.doesNotMatch(listed, />精选</, "an astronomy selection is not inherited by the AI4S column");
+  assert.doesNotMatch(listed, /AI 评分/, "a cross-listed row has no AI4S score, so the card invents none");
+  // The reverse combination: the AI4S column selected it while the astronomy column did not.
+  const picked = await renderCard(item({ crossListed: true, selected: true, score: null }));
+  assert.match(picked, />精选</, "the column's own selection is shown");
+  assert.doesNotMatch(picked, /AI 评分/, "selection alone does not imply an AI4S score");
+  // A native AI4S row is unchanged: its own selection and score both show.
+  const native = await renderCard(item({ crossListed: false, selected: true, score: 86 }));
+  assert.match(native, />精选</);
+  assert.match(native, /AI 评分/);
+  assert.match(native, /86/);
+});
+
+test("a cross-listed card does not cache this column's selection as the shared article page's chrome", async () => {
+  const src = readFileSync(new URL("../app/routes/ai4s.tsx", import.meta.url), "utf8");
+  assert.match(src, /if \(!item\.crossListed\) rememberPreview\(item\)/,
+    "the article page renders the astronomy projection, so a cross-listed card leaves the preview empty");
+  assert.match(src, /rememberOrigin\(item\.id\)/, "the return-focus record is column-independent and still written");
 });

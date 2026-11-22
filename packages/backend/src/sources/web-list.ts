@@ -124,8 +124,8 @@ function absolute(href: string | undefined, base: string): string | null {
   }
 }
 
-async function fetchListingText(source: SourceRow): Promise<{ text: string; viaJina: boolean; base: string }> {
-  const url = String(source.config.url ?? "");
+async function fetchListingText(source: SourceRow, urlOverride?: string): Promise<{ text: string; viaJina: boolean; base: string }> {
+  const url = String(urlOverride ?? source.config.url ?? "");
   if (!url) throw new FetchError("url missing");
   if (url.startsWith(JINA_PREFIX)) {
     const target = url.slice(JINA_PREFIX.length);
@@ -320,15 +320,128 @@ async function fromMimoHome(html: string, base: string, source: SourceRow): Prom
   throw new FetchError("mimo_home: no Blog list in the homepage's chunks");
 }
 
+/** A card's call-to-action reads like a title to a text extractor; it is never the article's name. */
+const CTA_TEXT = /^(read more|view article|learn more|see all|view all)$/i;
+
+/**
+ * Anthropic's science content has no official feed. Two server-rendered listings are read:
+ *
+ * - /science: titled `article` cards, heading in h2/h3 and the date in `time`.
+ * - /search?topic=discovery: one `details` row per hit, whose `summary` carries a category, a plain
+ *   date paragraph and the title, with the article link being a "View article" button.
+ *
+ * A generic readability extraction finds the paragraph copy but not the card list, so each shape is
+ * read from the page's own structure. A missing date stays missing; nothing is inferred from a
+ * sitemap's lastmod.
+ */
+function fromAnthropicScience(html: string, base: string, source: SourceRow): Candidate[] {
+  const $ = cheerio.load(html);
+  // One entry per article, in first-seen order: the same article also appears as a carousel slide
+  // whose link carries no title and no date, and it must not shadow the card that does.
+  const byUrl = new Map<string, Candidate>();
+  const add = (url: string | null, title: string, publishedAt: Date | null, excerpt: string | null) => {
+    if (!url || !title || title.length < 6 || CTA_TEXT.test(title) || !allowed(url, source)) return;
+    const prior = byUrl.get(url);
+    if (!prior) {
+      byUrl.set(url, { url, title, ...(publishedAt ? { publishedAt } : {}), ...(excerpt && excerpt !== title ? { excerpt } : {}) });
+      return;
+    }
+    // A later read of the same article may know what the first one did not.
+    if (!prior.publishedAt && publishedAt) prior.publishedAt = publishedAt;
+    if (prior.title.length < title.length) prior.title = title;
+    if (!prior.excerpt && excerpt && excerpt !== prior.title) prior.excerpt = excerpt;
+  };
+  const textOf = (el: cheerio.Cheerio<any>, selector: string) => collapseWhitespace(el.find(selector).first().text());
+  const dateIn = (el: cheerio.Cheerio<any>) => {
+    const t = el.find("time[datetime], time").first();
+    return parseLooseDate(t.attr("datetime") ?? t.text(), source.config.publishedAtUtcOffset, source.config.publishedAtUtcOffset !== undefined);
+  };
+  const linkIn = (el: cheerio.Cheerio<any>) => el.find('a[href*="/research/"], a[href*="/news/"]').first();
+  const dateOf = (value: string | null) => parseLooseDate(value, source.config.publishedAtUtcOffset, source.config.publishedAtUtcOffset !== undefined);
+  // Documented row shape: one row per article.
+  $("li[data-article-id]").each((_i, node) => {
+    const el = $(node);
+    const link = el.find("a[href]").first();
+    const url = absolute(link.attr("href"), base);
+    const title = textOf(el, "h2, h3, h4") || collapseWhitespace(link.text());
+    const excerpt = textOf(el, "p") || null;
+    add(url, title, dateIn(el), excerpt);
+  });
+  // Search-result row: a <details> card. Its summary holds the category, the date and the title as
+  // plain paragraphs, so the date is the line that parses as one and the title is the longest rest.
+  $("details").each((_i, node) => {
+    const card = $(node);
+    const summary = card.children("summary").first();
+    if (!summary.length) return;
+    const link = linkIn(card);
+    if (!link.length) return;
+    const lines = summary.find("p").toArray()
+      .map((n) => collapseWhitespace($(n).text()))
+      .filter((t) => t.length > 0);
+    const dated = lines.find((t) => dateOf(t) !== null) ?? null;
+    const title = lines.filter((t) => t !== dated).sort((a, b) => b.length - a.length)[0] ?? "";
+    const body = card.find("p").toArray()
+      .map((n) => collapseWhitespace($(n).text()))
+      .filter((t) => t.length > title.length && t !== dated);
+    add(absolute(link.attr("href"), base), title, dateOf(dated), body[0] ?? null);
+  });
+  // Card shape: a titled card holds the heading and the published date; read those first so the
+  // date is attached before any title-only link to the same article is met.
+  $("article").each((_i, node) => {
+    const card = $(node);
+    const link = linkIn(card);
+    if (!link.length) return;
+    const title = textOf(card, "h2, h3, h4") || collapseWhitespace(link.text());
+    add(absolute(link.attr("href"), base), title, dateIn(card), textOf(card, "p") || null);
+  });
+  // Any remaining link into the two prefixes (carousel slides, related-items strips). The card's own
+  // heading wins over the link's text, which on these cards is a "View article" button.
+  $('a[href*="/research/"], a[href*="/news/"]').each((_i, node) => {
+    const link = $(node);
+    const url = absolute(link.attr("href"), base);
+    const card = link.closest("article, li, div");
+    const title = textOf(card, "h2, h3, h4") || collapseWhitespace(link.text());
+    add(url, title, dateIn(card), textOf(card, "p") || null);
+  });
+  return [...byUrl.values()];
+}
+
+async function parseListing(text: string, base: string, viaJina: boolean, source: SourceRow): Promise<Candidate[]> {
+  const mode = source.config.adapter === "mimo_home" ? "mimo_home"
+    : source.config.adapter === "anthropic_science" ? "anthropic_science"
+      : source.config.parseMode ?? (viaJina ? "markdown" : "html");
+  if (mode === "mimo_home") return fromMimoHome(text, base, source);
+  if (mode === "anthropic_science") return fromAnthropicScience(text, base, source);
+  if (mode === "markdown") return fromMarkdown(text, base, source);
+  if (mode === "docusaurus_changelog") return fromDocusaurusChangelog(text, base, source);
+  return fromHtml(text, base, source);
+}
+
 export async function fetchWebList(source: SourceRow): Promise<Candidate[]> {
   const { text, viaJina, base } = await fetchListingText(source);
-  const mode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? (viaJina ? "markdown" : "html");
-  let out: Candidate[];
-  if (mode === "mimo_home") out = await fromMimoHome(text, base, source);
-  else if (mode === "markdown") out = fromMarkdown(text, base, source);
-  else if (mode === "docusaurus_changelog") out = fromDocusaurusChangelog(text, base, source);
-  else out = fromHtml(text, base, source);
-  if (out.length === 0) throw new FetchError(`no items matched (${mode})`);
+  const out = await parseListing(text, base, viaJina, source);
+  if (out.length === 0) throw new FetchError("no items matched");
+  // A second official entry (a listing the main page only links to partially) adds candidates to the
+  // SAME source identity, deduplicated by canonical URL. Its failure never hides a successful main
+  // listing, and a main listing that matched nothing still fails above rather than reporting success.
+  const supplementary = source.config.supplementaryUrl;
+  if (typeof supplementary === "string" && supplementary) {
+    try {
+      const extra = await fetchListingText(source, supplementary);
+      const extraSource = source.config.supplementaryItemSelector
+        ? { ...source, config: { ...source.config, itemSelector: String(source.config.supplementaryItemSelector) } }
+        : source;
+      const more = await parseListing(extra.text, extra.base, extra.viaJina, extraSource);
+      const seen = new Set(out.map((c) => c.url));
+      for (const c of more) {
+        if (seen.has(c.url)) continue;
+        seen.add(c.url);
+        out.push(c);
+      }
+    } catch (error) {
+      console.warn(`[web_list] ${source.id}: supplementary listing failed — ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   return out;
 }
 

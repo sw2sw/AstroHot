@@ -201,6 +201,12 @@ export interface Ai4sItemSummary extends FeedItemSummary {
   domain: string | null;
   /** Verified astronomy application (AI4A): true only with grounded original evidence, else false/null. */
   ai4a: boolean | null;
+  /**
+   * The article keeps its astronomy home and is listed here through the cross-list. `selected` and
+   * `score` on such a card are this column's own — it never inherits the astronomy selection or score,
+   * and has no AI4S score, so the score is null. The article page still shows the astronomy projection.
+   */
+  crossListed: boolean;
   /** Where a limited intro came from and what the original allows; null when the site shows full text. */
   accessNote: string | null;
 }

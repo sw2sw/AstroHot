@@ -8,10 +8,11 @@ const PUBLISHER = ["publisherRole", "publisherUrlPrefixes"];
 const COLLECTED = [...PUBLISHER, "cardImageAllowed", "cardImageRequiresCredit", "_aihot", "allowUrlPrefixes", "allowUrlRegex", "denyUrlPrefixes", "ingestNoiseFilter", "itemUrlPrefixRewrite", "sortByPublishedAt", "detail", "fetchPublicContent", "contentScope"];
 
 const KEYS: Record<SourceRow["kind"], string[]> = {
-  rss: [...COLLECTED, "feedUrl", "summaryIsBody", "preserveUrlFragment", "allowCategories", "denyCategories"],
+  rss: [...COLLECTED, "feedUrl", "summaryIsBody", "preserveUrlFragment", "allowCategories", "denyCategories", "sharedPrefilter"],
   web_list: [
     ...COLLECTED, "url", "baseUrl", "parseMode", "adapter", "cacheToleranceSeconds", "linksStartLine", "preserveUrlFragment",
     "itemSelector", "linkSelector", "titleSelector", "publishedAtSelector", "publishedAtRegex", "publishedAtUtcOffset",
+    "sharedPrefilter", "supplementaryUrl", "supplementaryItemSelector",
   ],
   json_list: [
     ...COLLECTED, "url", "mode", "method", "headers", "bodyJson", "jsonKey", "windowVar", "itemsPath", "itemsObjectValues",
@@ -39,7 +40,7 @@ const NESTED: Record<string, string[]> = {
 
 const VALUES: Record<string, string[]> = {
   publisherRole: ["organization", "person"],
-  adapter: ["mimo_home"],
+  adapter: ["mimo_home", "anthropic_science"],
   parseMode: ["html", "markdown", "docusaurus_changelog"],
   contentScope: ["astro", "ai4s"],
 };

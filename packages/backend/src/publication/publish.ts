@@ -20,6 +20,8 @@ interface ArticleRow {
   url: string;
   title: string;
   language: string | null;
+  /** Current material revision; an analysis of an older revision is a historical judgement. */
+  revision: number;
   published_at: Date | null;
   discovered_at: Date;
   timeline_at: Date;
@@ -35,6 +37,8 @@ interface ArticleRow {
 
 interface AnalysisRow {
   id: number;
+  /** The article revision this judgement read; a judgement of an older body speaks for that body only. */
+  input_revision: number;
   relevance: string | null;
   category: string | null;
   tags: string[];
@@ -80,6 +84,10 @@ interface PublicationRow {
   domain: string | null;
   ai4a: boolean | null;
   astro_cross_listed: boolean;
+  ai4s_cross_listed: boolean;
+  ai4s_selected: boolean;
+  /** This column's own release moment for its own selection (scope.ts ai4sSelectedCondition). */
+  ai4s_visible_after: Date | null;
 }
 
 export interface V1ItemPayload {
@@ -219,7 +227,7 @@ export async function publishArticle(articleId: string, options: PublishOptions 
 
 export async function publishArticleTx(tx: Tx, articleId: string, options: PublishOptions = {}): Promise<PublishResult | null> {
   const [article] = await tx<ArticleRow[]>`
-    SELECT id, source_id, url, title, language, published_at, discovered_at, timeline_at, backfill, body_status,
+    SELECT id, source_id, url, title, language, revision, published_at, discovered_at, timeline_at, backfill, body_status,
            body_text, x_post, grouped_at, grouping_status, selection_adds_value, content_scope
     FROM articles WHERE id = ${articleId} FOR UPDATE`;
   if (!article) return null;
@@ -232,7 +240,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     SELECT id, name, kind, tier, participation_mode, first_party, site_fulltext, syndicate_fulltext FROM sources WHERE id = ${article.source_id}`;
   if (!source) return null;
   const [analysis] = await tx<AnalysisRow[]>`
-    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected, output
+    SELECT id, input_revision, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected, output
     FROM analyses WHERE article_id = ${articleId} ORDER BY input_revision DESC, id DESC LIMIT 1`;
   const [override] = await tx<OverrideRow[]>`SELECT fields, visibility FROM editorial_overrides WHERE article_id = ${articleId}`;
   const [membership] = await tx<{ fact_id: number; story_id: number | null }[]>`
@@ -289,10 +297,35 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const manualAstroApproval = f.astroApproved === true && typeof f.astroApprovalNote === "string" && f.astroApprovalNote.trim().length > 0;
   const astroCrossListed = f.crossListed === true && eligible && (ai4a === true || manualAstroApproval);
 
+  // The opposite direction, and it is analysis-driven rather than an editorial override: when the
+  // shared prefilter passed BOTH dimensions the article keeps its astronomy row and additionally
+  // earns a display right in the AI4S column. The right comes from this revision's own AI4S
+  // dimension result — never from ai4a (evidence of science use, not a column right) and never by
+  // moving content_scope between columns.
+  //
+  // The columns select independently. A both-PASS row ran the astronomy chain, so it holds no
+  // AI4S-scored judgement; the AI4S column therefore lists it without selecting it, which is a legal
+  // state ("one column selects, the other only lists"). ai4s_selected is stored separately so an
+  // AI4S-scored judgement can set it later without touching the astronomy selection.
+  //
+  // Both readings must come from a judgement of the article's CURRENT revision. A late result for a
+  // body that has since moved on describes that older body: it may not grant (or keep) a display right
+  // for the new one. Rebuilding from an existing judgement still costs nothing — this only decides
+  // which stored judgement is allowed to speak for this revision.
+  const currentAnalysis = analysis && Number(analysis.input_revision) === Number(article.revision) ? analysis : null;
+  const sharedAi4s = currentAnalysis?.output?.sharedPrefilter?.ai4s;
+  const ai4sCrossListed = contentScope === "astro" && sharedAi4s === "PASS" && eligible;
+  const ai4sSelected = ai4sCrossListed && currentAnalysis?.output?.ai4sSelection === true;
+
   // Waiting candidates are readable in the pool, with no selected seat, sync entry or push.
   // Completion stamps the actual release after lock waits, including across report cutoffs.
   const selectedReadyAt = previous?.selected_ready_at ?? (selectionCandidate ? options.releasedAt ?? now : null);
   const visibleAfter = selected ? (previous?.selected && previous.visible_after ? previous.visible_after : options.releasedAt ?? now) : null;
+  // The same release rule for the AI4S column's own selection, kept apart from the astronomy one: an
+  // article only this column selected has no astronomy release moment to borrow.
+  const ai4sVisibleAfter = ai4sSelected
+    ? (previous?.ai4s_selected && previous.ai4s_visible_after ? previous.ai4s_visible_after : options.releasedAt ?? now)
+    : null;
 
   const indexable = isIndexable({
     visibility, hasSummary: !!summary, selected, seoIndexedAt: previous?.seo_indexed_at ?? null, seoExcludedAt: previous?.seo_excluded_at ?? null,
@@ -315,6 +348,8 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     visibility, eligible, selected, selection_candidate: selectionCandidate, title: title ?? collapseWhitespace(article.title), original_title: originalTitle, summary, reason,
     category, tags, score: round1(score), body_mode: bodyMode, story_id: membership?.story_id ?? null, fact_id: membership?.fact_id ?? null,
     indexable, content_scope: contentScope, domain, ai4a, astro_cross_listed: astroCrossListed,
+    ai4s_cross_listed: ai4sCrossListed, ai4s_selected: ai4sSelected,
+    ai4s_visible_after: ai4sVisibleAfter,
   };
   const changed =
     !previous ||
@@ -326,17 +361,19 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
         tags: [...previous.tags].sort(), score: previous.score === null ? null : Number(previous.score), body_mode: previous.body_mode,
         story_id: previous.story_id, fact_id: previous.fact_id, indexable: previous.indexable,
         content_scope: previous.content_scope, domain: previous.domain, ai4a: previous.ai4a, astro_cross_listed: previous.astro_cross_listed,
+        ai4s_cross_listed: previous.ai4s_cross_listed, ai4s_selected: previous.ai4s_selected,
+        ai4s_visible_after: previous.ai4s_visible_after,
       });
   const revision = previous ? previous.revision + (changed ? 1 : 0) : 1;
 
   await tx`
     INSERT INTO publications (article_id, analysis_id, revision, visibility, eligible, selected, selection_candidate, title, original_title, summary,
       reason, category, tags, score, source_id, channel, first_party, url, published_at, discovered_at, timeline_at, backfill,
-      selected_ready_at, visible_after, body_mode, syndicate, indexable, story_id, fact_id, content_scope, domain, ai4a, astro_cross_listed, search_text, sort_at, updated_at)
+      selected_ready_at, visible_after, body_mode, syndicate, indexable, story_id, fact_id, content_scope, domain, ai4a, astro_cross_listed, ai4s_cross_listed, ai4s_selected, ai4s_visible_after, search_text, sort_at, updated_at)
     VALUES (${articleId}, ${analysis?.id ?? null}, ${revision}, ${visibility}, ${eligible}, ${selected}, ${selectionCandidate}, ${next.title},
       ${originalTitle}, ${summary}, ${reason}, ${category}, ${tags}, ${next.score}, ${source.id}, ${channel}, ${source.tier === "T1"},
       ${article.url}, ${article.published_at}, ${article.discovered_at}, ${article.timeline_at}, ${article.backfill},
-      ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${syndicate}, ${indexable}, ${next.story_id}, ${next.fact_id}, ${contentScope}, ${domain}, ${ai4a}, ${astroCrossListed}, ${searchText}, ${sortAt}, now())
+      ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${syndicate}, ${indexable}, ${next.story_id}, ${next.fact_id}, ${contentScope}, ${domain}, ${ai4a}, ${astroCrossListed}, ${ai4sCrossListed}, ${ai4sSelected}, ${ai4sVisibleAfter}, ${searchText}, ${sortAt}, now())
     ON CONFLICT (article_id) DO UPDATE SET
       analysis_id = EXCLUDED.analysis_id, revision = EXCLUDED.revision, visibility = EXCLUDED.visibility,
       eligible = EXCLUDED.eligible, selected = EXCLUDED.selected, selection_candidate = EXCLUDED.selection_candidate, title = EXCLUDED.title, original_title = EXCLUDED.original_title,
@@ -347,6 +384,8 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
       visible_after = EXCLUDED.visible_after, body_mode = EXCLUDED.body_mode, syndicate = EXCLUDED.syndicate,
       indexable = EXCLUDED.indexable, story_id = EXCLUDED.story_id, fact_id = EXCLUDED.fact_id,
       content_scope = EXCLUDED.content_scope, domain = EXCLUDED.domain, ai4a = EXCLUDED.ai4a, astro_cross_listed = EXCLUDED.astro_cross_listed,
+      ai4s_cross_listed = EXCLUDED.ai4s_cross_listed, ai4s_selected = EXCLUDED.ai4s_selected,
+      ai4s_visible_after = EXCLUDED.ai4s_visible_after,
       -- updated_at is also the reader-side admission signal (timeline.ts reads max(updated_at)
       -- over a filtered scope): "an item arrived" must be provable even when the item carries an OLD
       -- release date. It is refreshed here, and only when the guard below accepts the write, so an
@@ -358,7 +397,8 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
         publications.source_id, publications.channel, publications.first_party, publications.url,
         publications.published_at, publications.discovered_at, publications.timeline_at, publications.backfill,
         publications.selected_ready_at, publications.visible_after, publications.body_mode, publications.syndicate,
-        publications.indexable, publications.story_id, publications.fact_id, publications.content_scope, publications.domain, publications.ai4a, publications.astro_cross_listed, publications.search_text,
+        publications.indexable, publications.story_id, publications.fact_id, publications.content_scope, publications.domain, publications.ai4a, publications.astro_cross_listed,
+        publications.ai4s_cross_listed, publications.ai4s_selected, publications.ai4s_visible_after, publications.search_text,
         publications.sort_at)
       IS DISTINCT FROM (EXCLUDED.analysis_id, EXCLUDED.revision, EXCLUDED.visibility, EXCLUDED.eligible,
         EXCLUDED.selected, EXCLUDED.selection_candidate, EXCLUDED.title, EXCLUDED.original_title, EXCLUDED.summary,
@@ -366,7 +406,8 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
         EXCLUDED.source_id, EXCLUDED.channel, EXCLUDED.first_party, EXCLUDED.url,
         EXCLUDED.published_at, EXCLUDED.discovered_at, EXCLUDED.timeline_at, EXCLUDED.backfill,
         EXCLUDED.selected_ready_at, EXCLUDED.visible_after, EXCLUDED.body_mode, EXCLUDED.syndicate,
-        EXCLUDED.indexable, EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.content_scope, EXCLUDED.domain, EXCLUDED.ai4a, EXCLUDED.astro_cross_listed, EXCLUDED.search_text,
+        EXCLUDED.indexable, EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.content_scope, EXCLUDED.domain, EXCLUDED.ai4a, EXCLUDED.astro_cross_listed,
+        EXCLUDED.ai4s_cross_listed, EXCLUDED.ai4s_selected, EXCLUDED.ai4s_visible_after, EXCLUDED.search_text,
         EXCLUDED.sort_at)`;
 
   // The pool search row follows eligibility; its body part only covers full text the site may show.
