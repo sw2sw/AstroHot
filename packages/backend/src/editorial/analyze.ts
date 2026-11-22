@@ -27,6 +27,7 @@ import {
   type IdentityGuard,
 } from "./writing.ts";
 import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, normalizeTags, TOPIC_TAGS } from "./vocabulary.ts";
+import { validateAi4sPass } from "./ai4s-relevance.ts";
 import { newsImageAttribution } from "./image-attribution.ts";
 import { reviewFirstImage, type ImageReview } from "./image-review.ts";
 import { promptText, promptVersion } from "./prompts.ts";
@@ -152,12 +153,14 @@ const SharedPrefilterSchema = z.object({
   astronomy: z.preprocess((v) => String(v ?? "").trim().toUpperCase(), z.enum(["PASS", "BLOCK", "UNKNOWN"])),
   ai4s: z.preprocess((v) => String(v ?? "").trim().toUpperCase(), z.enum(["PASS", "BLOCK", "UNKNOWN"])),
   reason: z.string().max(300).catch(""),
+  ai4sEvidence: z.unknown().optional(),
 });
 
 export type SharedLabel = "PASS" | "BLOCK" | "UNKNOWN";
 export interface SharedPrefilterResult {
   astronomy: SharedLabel;
   ai4s: SharedLabel;
+  ai4sEvidence?: unknown;
   reason: string;
   model: string;
   receiptId: number;
@@ -457,13 +460,15 @@ async function runSharedPrefilter(a: AnalyzeInputArticle, opts: StepOpts): Promi
     user: prefilterUser(a),
     schema: SharedPrefilterSchema,
     temperature: 0,
-    maxTokens: 512,
+    maxTokens: 1024,
     attemptTag: opts.attemptTag,
   });
   const missing = missingEvidence(a);
   const settle = (label: SharedLabel): SharedLabel => (label === "BLOCK" && missing ? "UNKNOWN" : label);
   return {
-    astronomy: settle(res.data.astronomy), ai4s: settle(res.data.ai4s), reason: res.data.reason,
+    astronomy: settle(res.data.astronomy),
+    ai4s: res.data.ai4s === "PASS" ? validateAi4sPass(res.data.ai4sEvidence, prefilterUser(a)) : settle(res.data.ai4s),
+    ai4sEvidence: res.data.ai4sEvidence, reason: res.data.reason,
     model: res.model, receiptId: res.receiptId, reused: res.reused, version: SHARED_PREFILTER_VERSION,
   };
 }
@@ -853,7 +858,7 @@ export function normalizeAnalysis(run: AnalysisRun, contentScope = "astro") {
     // What the shared prefilter decided, kept with the judgement so the route is auditable even when
     // the row's primary column later changes.
     sharedPrefilter: run.shared
-      ? { astronomy: run.shared.astronomy, ai4s: run.shared.ai4s, reason: run.shared.reason, version: run.shared.version }
+      ? { astronomy: run.shared.astronomy, ai4s: run.shared.ai4s, ai4sEvidence: run.shared.ai4sEvidence, reason: run.shared.reason, version: run.shared.version }
       : null,
     // The grounded conference notice (or null). It is projected into its own tables; it never adds a
     // selection score, a cross-listing or a second model call.

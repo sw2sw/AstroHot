@@ -10,6 +10,7 @@ import { upsertMaterial } from "@aihot/backend/content/materials";
 import { analyzeArticle, routeSharedPrefilter } from "@aihot/backend/editorial/analyze";
 import { publishArticle } from "@aihot/backend/publication/publish";
 import { stopBoss } from "@aihot/backend/jobs/queue";
+import { relevanceCases } from "./fixtures/ai4s/relevance.ts";
 
 const T = tag();
 const SHARED_SOURCE = `test-shared-${T}`;
@@ -19,11 +20,11 @@ type Step = "shared" | "prefilter" | "score" | "understand" | "summarize" | "str
 interface Req { step: Step; marker: string; system: string }
 const requests: Req[] = [];
 
-const MARKERS = ["ASTRO", "AIONLY", "BOTH", "NONE", "HOLD", "PLAIN"];
+const MARKERS = ["ASTRO", "AIONLY", "BOTH", "NONE", "HOLD", "PLAIN", "NOEVIDENCE", ...relevanceCases.map((c) => c.marker)];
 const sharedAnswers: Record<string, unknown> = {
   ASTRO: { astronomy: "PASS", ai4s: "BLOCK", reason: "天文观测结果" },
-  AIONLY: { astronomy: "BLOCK", ai4s: "PASS", reason: "AI 辅助数学证明" },
-  BOTH: { astronomy: "PASS", ai4s: "PASS", reason: "AI 参与天文研究" },
+  AIONLY: { astronomy: "BLOCK", ai4s: "PASS", reason: "AI 辅助数学证明", ai4sEvidence: { kind: "research", role: "primary", scope: "single", titleAligned: true, quote: "A neural prover established a bound for polynomial roots.", aiMethod: "neural prover", researchTask: "polynomial roots" } },
+  BOTH: { astronomy: "PASS", ai4s: "PASS", reason: "AI 参与天文研究", ai4sEvidence: { kind: "research", role: "primary", scope: "single", titleAligned: true, quote: "AI classified 12 million galaxy spectra in the survey.", aiMethod: "AI", researchTask: "galaxy spectra" } },
   NONE: { astronomy: "BLOCK", ai4s: "BLOCK", reason: "芯片销售" },
   HOLD: { astronomy: "BLOCK", ai4s: "UNKNOWN", reason: "材料不足" },
 };
@@ -54,7 +55,7 @@ const provider = await stub((_hit, req) => {
   if (step === "prefilter") return answer({ label: "PASS", reason: "天文" });
   if (step === "score") return answer({ attentionScore: 80 });
   if (step === "understand") return answer({ itemType: "research_result", authorRole: "principal", tags: [], editorialJudgment: `理由 ${marker}`, titleZh: `理解标题 ${marker}`, summaryZh: `理解摘要 ${marker}。第二句补充关键数字。` });
-  if (step === "ai4s-structure") return answer(ai4sStructureAnswers[marker]);
+  if (step === "ai4s-structure") return answer(ai4sStructureAnswers[marker] ?? { scope: "single", domain: "methods-tools", astroApplication: null, fact: null });
   if (step === "structure") return answer({ category: "stars-transients", tags: ["科研成果"], subjects: [], scope: "single", fact: null });
   return answer(`title_zh: 翻译标题 ${marker}\nsummary_zh: 翻译摘要 ${marker}。第二句补充影响。`);
 });
@@ -73,7 +74,7 @@ after(async () => {
 const article = async (marker: string, sourceId = SHARED_SOURCE, bodyText?: string) =>
   (await upsertMaterial({
     sourceId, url: `https://example.com/${marker}-${T}`, title: `${marker} science result ${T}`,
-    bodyText: bodyText ?? `${marker}: a detailed scientific report with methods, results and a quantitative finding (${T}).`,
+    bodyText: bodyText ?? (marker === "AIONLY" ? "A neural prover established a bound for polynomial roots." : `${marker}: a detailed scientific report with methods, results and a quantitative finding (${T}).`),
     bodyStatus: "ok", coverage: "full_text", via: "fetch", publishedAt: new Date("2026-11-20T02:00:00Z"),
   } as never)).articleId;
 const calls = (marker: string) => requests.filter((r) => r.marker === marker).map((r) => r.step);
@@ -177,4 +178,30 @@ test("A09 a source outside the shared scope still uses the single-column astrono
   assert.deepEqual(calls("PLAIN").sort(), ["prefilter", "score", "score", "structure", "understand"]);
   assert.equal(await articleScope(id), "astro");
   assert.ok(!requests.some((r) => r.marker === "PLAIN" && r.step === "shared"));
+});
+
+test("a bare shared AI4S PASS holds without buying downstream analysis", async () => {
+  const id = await article("NOEVIDENCE");
+  sharedAnswers.NOEVIDENCE = { astronomy: "BLOCK", ai4s: "PASS", reason: "generic science" };
+  const res = await analyzeArticle(id);
+  assert.equal(res!.output!.relevance, "unknown");
+  assert.deepEqual(calls("NOEVIDENCE"), ["shared"]);
+  await analyzeArticle(id);
+  assert.deepEqual(calls("NOEVIDENCE"), ["shared"], "held response is reused, not paid again");
+});
+
+for (const c of relevanceCases) test(`shared same-request guard: ${c.title}`, async () => {
+  sharedAnswers[c.marker] = { astronomy: "BLOCK", ai4s: "PASS", reason: "synthetic candidate", ai4sEvidence: c.evidence };
+  const id = (await upsertMaterial({ sourceId: SHARED_SOURCE, url: `https://example.com/${c.marker}-${T}`,
+    title: c.title + " " + c.marker, bodyText: c.body, bodyStatus: "ok", coverage: "full_text", via: "fetch",
+  } as never)).articleId;
+  const res = await analyzeArticle(id);
+  assert.equal(res!.output!.relevance, c.expected.toLowerCase());
+  assert.equal(calls(c.marker).filter((s) => s === "shared").length, 1);
+  if (c.expected !== "PASS") {
+    assert.deepEqual(calls(c.marker), ["shared"], "no downstream request for an incidental or non-AI article");
+    assert.equal(await articleScope(id), "astro", "rejection does not move primary ownership");
+  }
+  const stored = await analysisRow(id);
+  assert.deepEqual(stored.output.sharedPrefilter.ai4sEvidence, c.evidence);
 });

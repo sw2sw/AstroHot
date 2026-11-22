@@ -44,7 +44,7 @@ const provider = await stub(async (_hit, req) => {
   const answer = (content: unknown) => ({ id: `stub-${sharedRequests.length}`, model: "stub", choices: [{ message: { content: JSON.stringify(content) } }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } });
   if (step === "shared") {
     // AI4S-only: this route would move the article into the AI4S column if it were still current.
-    return answer({ astronomy: "BLOCK", ai4s: "PASS", reason: "AI 辅助科研" });
+    return answer({ astronomy: "BLOCK", ai4s: "PASS", reason: "AI 辅助科研", ai4sEvidence: { kind: "research", role: "primary", scope: "single", titleAligned: true, quote: "the team used a model to analyse survey data and reported a quantitative result", aiMethod: "model", researchTask: "survey data" } });
   }
   if (step === "score") return answer({ attentionScore: 80 });
   if (step === "understand") return answer({ itemType: "research_result", authorRole: "principal", tags: [], editorialJudgment: "理由", titleZh: "理解标题", summaryZh: "理解摘要。第二句补充关键数字。" });
